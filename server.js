@@ -1,7 +1,6 @@
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 const express = require('express');
-const axios = require('axios');
 const cors = require('cors');
 const path = require('path');
 require('dotenv').config();
@@ -15,36 +14,25 @@ app.use(express.json());
 // 정적 파일 서빙 (public 폴더)
 app.use(express.static(path.join(__dirname, 'public')));
 
-// 공공데이터 프록시 엔드포인트 (구역별 상가 조회 API)
+// 가상 데이터 테스트용 프록시 엔드포인트
 app.get('/api/franchises', async (req, res) => {
     try {
-        const serviceKey = process.env.PUBLIC_API_KEY;
-        
-        if (!serviceKey) {
-            console.error('❌ 에러: PUBLIC_API_KEY 환경변수가 설정되지 않았습니다.');
-            return res.status(500).json({ error: '서버에 공공데이터 API 인증키가 설정되지 않았습니다.' });
-        }
-
-        // 구역별 상가정보 조회 엔드포인트
-        const url = 'https://apis.data.go.kr/B553077/api/open/sdsc2/storeListInArea';
-
-        const apiResponse = await axios.get(url, {
-            params: {
-                serviceKey: serviceKey,
-                key: '1168010100',  // 역삼1동 법정동 코드
-                numOfRows: '50',
-                type: 'json'
+        // 공공데이터 연동 전 정상 통신 테스트를 위한 가상 상점 데이터
+        const mockData = {
+            body: {
+                items: [
+                    { bizesNm: '스타벅스 역삼점', indsSclsNm: '커피숍/카페', rdnmAdr: '서울특별시 강남구 테헤란로 152', lat: '37.500655', lon: '127.036431' },
+                    { bizesNm: '투썸플레이스 역삼역점', indsSclsNm: '커피숍/카페', rdnmAdr: '서울특별시 강남구 테헤란로 145', lat: '37.500120', lon: '127.035500' },
+                    { bizesNm: '파리바게뜨 역삼중앙점', indsSclsNm: '제과/제빵', rdnmAdr: '서울특별시 강남구 역삼로 100', lat: '37.498000', lon: '127.038000' }
+                ]
             }
-        });
-        
-        res.json(apiResponse.data);
+        };
+
+        res.json(mockData);
 
     } catch (error) {
-        console.error('공공데이터 연동 상세 에러:', error.response?.data || error.message);
-        res.status(500).json({ 
-            error: '공공데이터 서버와 통신 중 오류가 발생했습니다.', 
-            details: error.response?.data || error.message 
-        });
+        console.error('테스트 데이터 응답 오류:', error);
+        res.status(500).json({ error: '서버 내부 오류 발생' });
     }
 });
 
