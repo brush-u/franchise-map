@@ -156,16 +156,18 @@
         <h1>☕ 상권 및 프랜차이즈 정보 조회</h1>
 
         <div class="search-box">
-            <select id="lclsSelect"><option value="">대분류 불러오는 중...</option></select>
-            <select id="mclsSelect" disabled><option value="">중분류 선택</option></select>
+            <select id="lclsSelect"><option value="">대분류 (전체)</option></select>
+            <select id="mclsSelect" disabled><option value="">중분류 (전체)</option></select>
             <select id="sclsSelect" disabled><option value="">소분류 (전체)</option></select>
+            <input id="radiusInput" type="number" value="1000" min="100" max="5000" step="100" style="width:100px; padding:9px; border-radius:6px; border:1px solid #ced4da;" title="검색 반경(m)">
             <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:#495057;">
                 <input type="checkbox" id="franchiseOnlyCheck"> 프랜차이즈만 보기
             </label>
-            <button id="loadBtn">상권 데이터 불러오기</button>
+            <button id="loadBtn">지도 중심에서 검색</button>
         </div>
         <p style="text-align:center; font-size:11px; color:#adb5bd; margin-top:-4px; margin-bottom:18px;">
-            ⓘ "프랜차이즈만 보기"는 지점명(brchNm)이 등록된 항목만 남기는 근사 필터입니다. 원본 데이터에 프랜차이즈 여부 필드는 없습니다.
+            ⓘ 지도를 원하는 위치로 이동/확대한 뒤 검색하면 그 중심 좌표 기준 반경(m) 안에서 조회합니다.
+            "프랜차이즈만 보기"는 지점명(brchNm)이 등록된 항목만 남기는 근사 필터입니다.
         </p>
 
         <div id="map"></div>
@@ -232,7 +234,7 @@
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || '대분류 조회 실패');
 
-                lclsSelect.innerHTML = '<option value="">대분류 선택</option>' +
+                lclsSelect.innerHTML = '<option value="">대분류 (전체)</option>' +
                     data.items.map(it => `<option value="${it.indsLclsCd}">${it.indsLclsNm}</option>`).join('');
             } catch (err) {
                 lclsSelect.innerHTML = '<option value="">대분류 조회 실패</option>';
@@ -365,12 +367,17 @@
             if (useFallback) {
                 qs = new URLSearchParams({ useFallback: '1' });
             } else {
-                const indsLclsCd = lclsSelect.value;
-                if (!indsLclsCd) {
-                    showError('대분류를 선택해주세요', '업종 대분류는 필수 파라미터입니다.');
+                if (!kakaoReady || !map) {
+                    showError('지도가 아직 준비되지 않았습니다', 'Kakao 지도 로드가 완료된 후 다시 시도해주세요.');
                     return;
                 }
-                qs = new URLSearchParams({ indsLclsCd });
+                const center = map.getCenter();
+                qs = new URLSearchParams({
+                    cx: String(center.getLng()),
+                    cy: String(center.getLat()),
+                    radius: document.getElementById('radiusInput').value || '1000',
+                });
+                if (lclsSelect.value) qs.set('indsLclsCd', lclsSelect.value);
                 if (mclsSelect.value) qs.set('indsMclsCd', mclsSelect.value);
                 if (sclsSelect.value) qs.set('indsSclsCd', sclsSelect.value);
                 if (document.getElementById('franchiseOnlyCheck').checked) qs.set('franchiseOnly', '1');
