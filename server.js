@@ -14,12 +14,16 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// 소상공인시장진흥공단 상가(상권)정보 - 업종별 상가업소 조회
-const API_BASE_URL = 'http://apis.data.go.kr/B553077/api/open/sdsc2/storeListInUpjong';
+// 소상공인시장진흥공단 상가(상권)정보 API (B553077)
+const SDSC2_BASE = 'http://apis.data.go.kr/B553077/api/open/sdsc2';
+const STORE_LIST_URL = `${SDSC2_BASE}/storeListInUpjong`;
+const LARGE_UPJONG_URL = `${SDSC2_BASE}/largeUpjongList`;
+const MIDDLE_UPJONG_URL = `${SDSC2_BASE}/middleUpjongList`;
+const SMALL_UPJONG_URL = `${SDSC2_BASE}/smallUpjongList`;
 const STORES_FILE_PATH = path.join(__dirname, 'stores.json');
 
-// 공공 API 장애 및 파라미터 인증 오류 시 안전하게 제공할 표준 샘플 데이터
-// lon/lat을 포함해야 지도 표기가 가능하므로 폴백 데이터에도 좌표를 넣어둔다.
+// 실제 API가 죽었을 때 지도 UI만 확인해보고 싶을 때 쓰는 샘플 데이터.
+// 절대 실제 결과인 것처럼 위장하지 않는다 (header.resultMsg에 SAMPLE임을 명시).
 const FALLBACK_STORES = [
   { bizesNm: '스타벅스 강남점', indsSclsNm: '커피숍/카페', rdnmAdr: '서울특별시 강남구 강남대로 390', lon: 127.0276, lat: 37.4979 },
   { bizesNm: '투썸플레이스 역삼점', indsSclsNm: '커피숍/카페', rdnmAdr: '서울특별시 강남구 테헤란로 134', lon: 127.0357, lat: 37.5006 },
@@ -28,36 +32,108 @@ const FALLBACK_STORES = [
   { bizesNm: '커피빈 삼성점', indsSclsNm: '커피숍/카페', rdnmAdr: '서울특별시 강남구 영동대로 513', lon: 127.0621, lat: 37.5089 },
 ];
 
-// 프론트에서 Kakao 지도 SDK를 로드하기 위한 JS 키 전달용.
-// Kakao JS 키는 도메인 화이트리스트로 보호되므로 프론트에 노출되어도 무방하지만,
-// 소스에 직접 하드코딩하지 않고 서버 env를 통해 내려준다.
 app.get('/api/config', (req, res) => {
   res.json({ kakaoJsKey: process.env.KAKAO_JS_KEY || '' });
 });
 
-app.get('/api/franchises', async (req, res) => {
+// ------------------------------------------------------------
+// 업종 분류 조회 (대/중/소) - 코드를 하드코딩하지 않고 API에서 그대로 가져온다.
+// ------------------------------------------------------------
+
+function requireServiceKey(res) {
+  const serviceKey = process.env.PUBLIC_API_KEY;
+  if (!serviceKey) {
+    res.status(500).json({ error: '서버에 공공데이터 API 인증키(PUBLIC_API_KEY)가 설정되지 않았습니다.' });
+    return null;
+  }
+  return serviceKey;
+}
+
+app.get('/api/upjong/large', async (req, res) => {
+  const serviceKey = requireServiceKey(res);
+  if (!serviceKey) return;
   try {
-    const serviceKey = process.env.PUBLIC_API_KEY;
-
-    // storeListInUpjong은 indsLclsCd(대분류)가 필수 파라미터다.
-    // indsSclsCd(소분류)만 보내면 NO_MANDATORY_REQUEST_PARAMETERS_ERROR(resultCode 11)가 발생한다.
-    // 대/중/소분류는 계층 관계이므로 세 값을 함께 보내야 정확히 좁혀진다.
-    const indsLclsCd = req.query.indsLclsCd; // 필수
-    const indsMclsCd = req.query.indsMclsCd; // 선택 (중분류로 좁힘)
-    const indsSclsCd = req.query.indsSclsCd; // 선택 (소분류로 좁힘)
-    const numOfRows = req.query.numOfRows || 100;
-
-    if (!serviceKey) {
-      console.error('❌ 에러: PUBLIC_API_KEY 환경변수가 설정되지 않았습니다.');
-      return res.status(500).json({ error: '서버에 공공데이터 API 인증키가 설정되지 않았습니다.' });
+    const url = `${LARGE_UPJONG_URL}?${new URLSearchParams({ serviceKey, numOfRows: '50', pageNo: '1', type: 'json' })}`;
+    const { data } = await axios.get(url, { timeout: 10000 });
+    if (data?.header?.resultCode !== '00') {
+      console.log('🔍 [대분류 조회 실패 응답]', JSON.stringify(data));
+      return res.status(502).json({ error: '대분류 조회 실패', header: data?.header });
     }
+    res.json({ items: data?.body?.items ?? [] });
+  } catch (err) {
+    console.warn('⚠️ 대분류 조회 통신 오류:', err.message);
+    res.status(502).json({ error: '대분류 조회 통신 오류', detail: err.message });
+  }
+});
 
-    if (!indsLclsCd) {
-      return res.status(400).json({ error: 'indsLclsCd(업종 대분류 코드)는 필수 파라미터입니다.' });
+app.get('/api/upjong/middle', async (req, res) => {
+  const serviceKey = requireServiceKey(res);
+  if (!serviceKey) return;
+  const { indsLclsCd } = req.query;
+  if (!indsLclsCd) return res.status(400).json({ error: 'indsLclsCd는 필수입니다.' });
+  try {
+    const url = `${MIDDLE_UPJONG_URL}?${new URLSearchParams({ serviceKey, indsLclsCd, numOfRows: '100', pageNo: '1', type: 'json' })}`;
+    const { data } = await axios.get(url, { timeout: 10000 });
+    if (data?.header?.resultCode !== '00') {
+      console.log('🔍 [중분류 조회 실패 응답]', JSON.stringify(data));
+      return res.status(502).json({ error: '중분류 조회 실패', header: data?.header });
     }
+    res.json({ items: data?.body?.items ?? [] });
+  } catch (err) {
+    console.warn('⚠️ 중분류 조회 통신 오류:', err.message);
+    res.status(502).json({ error: '중분류 조회 통신 오류', detail: err.message });
+  }
+});
 
-    console.log(`🌐 [공공데이터 API 호출] indsLclsCd=${indsLclsCd} indsMclsCd=${indsMclsCd || '-'} indsSclsCd=${indsSclsCd || '-'}`);
+app.get('/api/upjong/small', async (req, res) => {
+  const serviceKey = requireServiceKey(res);
+  if (!serviceKey) return;
+  const { indsLclsCd, indsMclsCd } = req.query;
+  if (!indsLclsCd || !indsMclsCd) return res.status(400).json({ error: 'indsLclsCd, indsMclsCd는 필수입니다.' });
+  try {
+    const url = `${SMALL_UPJONG_URL}?${new URLSearchParams({ serviceKey, indsLclsCd, indsMclsCd, numOfRows: '200', pageNo: '1', type: 'json' })}`;
+    const { data } = await axios.get(url, { timeout: 10000 });
+    if (data?.header?.resultCode !== '00') {
+      console.log('🔍 [소분류 조회 실패 응답]', JSON.stringify(data));
+      return res.status(502).json({ error: '소분류 조회 실패', header: data?.header });
+    }
+    res.json({ items: data?.body?.items ?? [] });
+  } catch (err) {
+    console.warn('⚠️ 소분류 조회 통신 오류:', err.message);
+    res.status(502).json({ error: '소분류 조회 통신 오류', detail: err.message });
+  }
+});
 
+// ------------------------------------------------------------
+// 상가업소 목록 조회
+// ------------------------------------------------------------
+app.get('/api/franchises', async (req, res) => {
+  const serviceKey = requireServiceKey(res);
+  if (!serviceKey) return;
+
+  // useFallback=1일 때만 명시적으로 샘플 데이터를 내려준다.
+  // (실패를 성공처럼 위장하지 않기 위해, 자동 폴백은 하지 않는다)
+  if (req.query.useFallback === '1') {
+    console.log('🧪 [샘플 데이터 요청] useFallback=1 명시적 호출');
+    fs.writeFileSync(STORES_FILE_PATH, JSON.stringify(FALLBACK_STORES, null, 2), 'utf-8');
+    return res.json({
+      header: { resultCode: 'SAMPLE', resultMsg: '실제 API 응답이 아닌 샘플 데이터입니다.' },
+      body: { items: FALLBACK_STORES, totalCount: FALLBACK_STORES.length },
+    });
+  }
+
+  const indsLclsCd = req.query.indsLclsCd; // 필수
+  const indsMclsCd = req.query.indsMclsCd; // 선택
+  const indsSclsCd = req.query.indsSclsCd; // 선택
+  const numOfRows = req.query.numOfRows || 100;
+
+  if (!indsLclsCd) {
+    return res.status(400).json({ error: 'indsLclsCd(업종 대분류 코드)는 필수 파라미터입니다.' });
+  }
+
+  console.log(`🌐 [공공데이터 API 호출] indsLclsCd=${indsLclsCd} indsMclsCd=${indsMclsCd || '-'} indsSclsCd=${indsSclsCd || '-'}`);
+
+  try {
     const params = new URLSearchParams({
       serviceKey,
       indsLclsCd,
@@ -68,47 +144,35 @@ app.get('/api/franchises', async (req, res) => {
     if (indsMclsCd) params.set('indsMclsCd', indsMclsCd);
     if (indsSclsCd) params.set('indsSclsCd', indsSclsCd);
 
-    const requestUrl = `${API_BASE_URL}?${params.toString()}`;
-
-    const response = await axios.get(requestUrl, { timeout: 10000 });
+    const response = await axios.get(`${STORE_LIST_URL}?${params.toString()}`, { timeout: 10000 });
     const data = response.data;
 
-    // 공공 API가 정상 응답을 주지 않거나 파라미터 에러를 뱉는 경우 안전하게 샘플 데이터 반환
-    if (!data?.body?.items || data.body.items.length === 0) {
-      // 원인 진단용: 실제 응답 원문을 그대로 출력 (에러코드/메시지가 여기 들어있음)
+    // 실패도 실패 그대로 프론트에 전달한다. 여기서 조용히 성공처럼 바꿔치기하지 않는다.
+    if (data?.header?.resultCode !== '00') {
       console.log('🔍 [진단] 공공데이터 API 원본 응답:', JSON.stringify(data, null, 2));
-      console.log('⚠️ 공공데이터 서버에서 유효한 데이터를 받지 못해 표준 상권 데이터를 로드합니다.');
-      fs.writeFileSync(STORES_FILE_PATH, JSON.stringify(FALLBACK_STORES, null, 2), 'utf-8');
-      return res.json({
-        header: { resultCode: '00', resultMsg: 'NORMAL SERVICE (FALLBACK)' },
-        body: { items: FALLBACK_STORES, totalCount: FALLBACK_STORES.length },
+      return res.status(502).json({
+        error: '공공데이터 API가 정상 응답을 반환하지 않았습니다.',
+        header: data?.header,
       });
     }
 
-    // 공공 API 원본 필드명은 lon/lat (경도/위도). 좌표 없는 항목은 지도에 못 찍으므로 걸러서 카운트만 로그로 남긴다.
-    const items = data.body.items;
+    const items = data.body?.items ?? [];
     const withCoords = items.filter((it) => it.lon && it.lat);
     if (withCoords.length < items.length) {
       console.log(`⚠️ 좌표 누락 ${items.length - withCoords.length}건 (전체 ${items.length}건 중)`);
     }
 
-    const totalCount = data.body.totalCount || items.length;
-
+    const totalCount = data.body?.totalCount ?? items.length;
     console.log(`📊 조회된 데이터 건수: ${totalCount}건 (좌표 보유 ${withCoords.length}건)`);
     fs.writeFileSync(STORES_FILE_PATH, JSON.stringify(items, null, 2), 'utf-8');
 
-    res.json({
-      header: data.header || { resultCode: '00', resultMsg: 'NORMAL SERVICE' },
-      body: { items, totalCount },
-    });
+    res.json({ header: data.header, body: { items, totalCount } });
   } catch (error) {
-    console.warn('⚠️ 공공데이터 통신 중 예외 발생, 샘플 데이터를 대체 반환합니다:', error.message);
-
-    // 예외 발생 시에도 중단 없이 프론트엔드가 정상 작동하도록 폴백 데이터 반환
-    fs.writeFileSync(STORES_FILE_PATH, JSON.stringify(FALLBACK_STORES, null, 2), 'utf-8');
-    res.json({
-      header: { resultCode: '00', resultMsg: 'NORMAL SERVICE (FALLBACK)' },
-      body: { items: FALLBACK_STORES, totalCount: FALLBACK_STORES.length },
+    // 네트워크 자체가 죽은 경우도 마찬가지로 에러를 그대로 전달한다.
+    console.warn('⚠️ 공공데이터 통신 중 예외 발생:', error.message);
+    res.status(502).json({
+      error: '공공데이터 API 통신 중 오류가 발생했습니다.',
+      detail: error.message,
     });
   }
 });
