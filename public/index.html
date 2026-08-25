@@ -53,13 +53,25 @@
     let map = null, clusterer = null, currentOverlay = null;
     let isKakaoLoaded = false;
 
-    // 카카오 스크립트 로드 실패 시 호출되는 함수
+// 카카오 스크립트 로드 실패 시 호출되는 함수
     function handleKakaoError() {
         console.warn('⚠️ 카카오 지도 스크립트 로드가 차단되었습니다. 지도 기능 없이 상점 목록만 표시합니다.');
         document.getElementById('map').innerHTML = '⚠️ 네트워크 환경에 의해 카카오 지도가 차단되었습니다. (상점 카드 목록은 정상 이용 가능)';
         isKakaoLoaded = false;
-        fetchDataFromServer(); // 지도 없어도 데이터는 불러오도록 실행
+        
+        // 지도가 실패하든 말든 데이터 조호는 무조건 실행!
+        fetchDataFromServer(); 
     }
+
+    window.onload = function() {
+        // 카카오 스크립트가 정상 로드된 경우
+        if (typeof kakao !== 'undefined' && kakao.maps) {
+            kakao.maps.load(initMap);
+        } else {
+            // 카카오 객체가 없거나 차단된 경우 안전하게 에러 핸들러 호출 후 데이터 로드
+            handleKakaoError();
+        }
+    };
 
     function initMap() {
         try {
