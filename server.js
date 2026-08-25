@@ -14,7 +14,6 @@ app.use(express.json());
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// 실제 공공데이터 API 연동 버전 (올바른 파라미터 적용)
 app.get('/api/franchises', async (req, res) => {
     try {
         const serviceKey = process.env.PUBLIC_API_KEY;
@@ -29,12 +28,15 @@ app.get('/api/franchises', async (req, res) => {
         const apiResponse = await axios.get(url, {
             params: {
                 serviceKey: serviceKey,
-                divId: 'ad',          // 행정동 구분 코드
-                key: '11680640',      // 역삼1동 행정동 코드
+                divId: 'ad',
+                key: '11680640',
                 type: 'json'
             }
         });
         
+        // 공공데이터 응답 구조 확인용 로그
+        console.log('공공데이터 원본 응답:', JSON.stringify(apiResponse.data, null, 2));
+
         res.json(apiResponse.data);
 
     } catch (error) {
