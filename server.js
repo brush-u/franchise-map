@@ -15,8 +15,12 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // 소상공인시장진흥공단 상가(상권)정보 API (B553077)
+// storeListInUpjong은 신버전(sdsc2)이 아니라 구버전(sdsc) 오퍼레이션이며
+// indsLclsCd 직접 지정이 아니라 divId(구분ID) + key(코드값) 방식을 쓴다.
+// 예: divId=indsLclsCd&key=Q  /  divId=indsMclsCd&key=Q12  /  divId=indsSclsCd&key=Q12A01
+const SDSC_BASE = 'http://apis.data.go.kr/B553077/api/open/sdsc';
 const SDSC2_BASE = 'http://apis.data.go.kr/B553077/api/open/sdsc2';
-const STORE_LIST_URL = `${SDSC2_BASE}/storeListInUpjong`;
+const STORE_LIST_URL = `${SDSC_BASE}/storeListInUpjong`;
 const LARGE_UPJONG_URL = `${SDSC2_BASE}/largeUpjongList`;
 const MIDDLE_UPJONG_URL = `${SDSC2_BASE}/middleUpjongList`;
 const SMALL_UPJONG_URL = `${SDSC2_BASE}/smallUpjongList`;
@@ -122,27 +126,39 @@ app.get('/api/franchises', async (req, res) => {
     });
   }
 
-  const indsLclsCd = req.query.indsLclsCd; // 필수
+  const indsLclsCd = req.query.indsLclsCd; // 필수 (최소 대분류는 있어야 함)
   const indsMclsCd = req.query.indsMclsCd; // 선택
   const indsSclsCd = req.query.indsSclsCd; // 선택
+  const franchiseOnly = req.query.franchiseOnly === '1';
   const numOfRows = req.query.numOfRows || 100;
 
   if (!indsLclsCd) {
     return res.status(400).json({ error: 'indsLclsCd(업종 대분류 코드)는 필수 파라미터입니다.' });
   }
 
-  console.log(`🌐 [공공데이터 API 호출] indsLclsCd=${indsLclsCd} indsMclsCd=${indsMclsCd || '-'} indsSclsCd=${indsSclsCd || '-'}`);
+  // divId/key는 계층 중 가장 구체적인 값 하나만 지정하는 방식이다.
+  // (구버전 API 특성상 대/중/소분류를 동시에 조합해서 보낼 수 없다)
+  let divId = 'indsLclsCd';
+  let key = indsLclsCd;
+  if (indsSclsCd) {
+    divId = 'indsSclsCd';
+    key = indsSclsCd;
+  } else if (indsMclsCd) {
+    divId = 'indsMclsCd';
+    key = indsMclsCd;
+  }
+
+  console.log(`🌐 [공공데이터 API 호출] divId=${divId} key=${key} franchiseOnly=${franchiseOnly}`);
 
   try {
     const params = new URLSearchParams({
-      serviceKey,
-      indsLclsCd,
+      ServiceKey: serviceKey, // 구버전 API는 대문자 ServiceKey를 사용한다
+      divId,
+      key,
       pageNo: '1',
       numOfRows: String(numOfRows),
       type: 'json',
     });
-    if (indsMclsCd) params.set('indsMclsCd', indsMclsCd);
-    if (indsSclsCd) params.set('indsSclsCd', indsSclsCd);
 
     const response = await axios.get(`${STORE_LIST_URL}?${params.toString()}`, { timeout: 10000 });
     const data = response.data;
@@ -156,13 +172,23 @@ app.get('/api/franchises', async (req, res) => {
       });
     }
 
-    const items = data.body?.items ?? [];
+    let items = data.body?.items ?? [];
+
+    // 프랜차이즈만 보기: 이 데이터셋엔 "프랜차이즈 여부" 필드가 없다.
+    // brchNm(지점명)이 채워진 항목은 본사상호+지점명 구조로 등록된 체인점일 가능성이 높다는 점을
+    // 근사치로 활용한다. 100% 정확한 판별은 아니다.
+    if (franchiseOnly) {
+      const before = items.length;
+      items = items.filter((it) => it.brchNm && it.brchNm.trim() !== '');
+      console.log(`🏪 프랜차이즈 필터 적용: ${before}건 중 ${items.length}건 (지점명 있는 항목만)`);
+    }
+
     const withCoords = items.filter((it) => it.lon && it.lat);
     if (withCoords.length < items.length) {
       console.log(`⚠️ 좌표 누락 ${items.length - withCoords.length}건 (전체 ${items.length}건 중)`);
     }
 
-    const totalCount = data.body?.totalCount ?? items.length;
+    const totalCount = franchiseOnly ? items.length : (data.body?.totalCount ?? items.length);
     console.log(`📊 조회된 데이터 건수: ${totalCount}건 (좌표 보유 ${withCoords.length}건)`);
     fs.writeFileSync(STORES_FILE_PATH, JSON.stringify(items, null, 2), 'utf-8');
 
