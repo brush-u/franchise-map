@@ -3,212 +3,145 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>선릉·역삼 실시간 공공데이터 상권 맵</title>
-    <!-- 카카오 지도 API -->
-    <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=4d5aaedcde7f98e5717fef7eb4e1652d&libraries=clusterer,services" onerror="handleKakaoError()"></script>
+    <title>프랜차이즈 상권 지도</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        .franchise-hub-container {
-            font-family: 'Pretendard', -apple-system, sans-serif;
-            max-width: 1300px;
-            margin: 20px auto;
-            padding: 20px;
-            background: #f8fafc;
-            border-radius: 12px;
-            border: 1px solid #e2e8f0;
-        }
-        .hub-header { text-align: center; margin-bottom: 20px; }
-        .hub-header h2 { font-size: 1.6rem; color: #0f172a; margin-bottom: 8px; }
-        #map { width: 100%; height: 500px; border-radius: 10px; border: 1px solid #cbd5e1; margin-bottom: 16px; background: #e2e8f0; display: flex; align-items: center; justify-content: center; color: #64748b; font-weight: 600; }
-        .map-control-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
-        .status-indicator { font-size: 0.85rem; font-weight: 600; color: #2563eb; background: #eff6ff; padding: 8px 14px; border-radius: 8px; border: 1px solid #bfdbfe; }
-        .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; max-height: 480px; overflow-y: auto; padding-right: 4px; }
-        .fran-card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); cursor: pointer; }
-        .fran-card h3 { font-size: 0.95rem; color: #1e293b; margin: 0 0 4px 0; }
-        .fran-loc, .fran-phone { font-size: 0.75rem; color: #64748b; margin: 2px 0; }
-        .loading-box { text-align: center; grid-column: 1 / -1; padding: 40px; color: #475569; font-weight: 600; }
-        .soft-box-bubble { background: #ffffff; border: 1px solid #cbd5e1; padding: 8px 12px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); text-align: center; width: 180px; }
+        body { font-family: 'Malgun Gothic', sans-serif; }
     </style>
 </head>
-<body>
+<body class="bg-gray-100 min-h-screen flex flex-col">
 
-<div class="franchise-hub-container">
-    <div class="hub-header">
-        <h2>🏛️ 선릉·역삼 공공데이터 실시간 연동 맵</h2>
-        <p>백엔드 프록시 서버를 경유하여 안전하게 호출된 상권 데이터</p>
-    </div>
+    <!-- 상단 헤더 -->
+    <header class="bg-blue-600 text-white shadow-md p-4 text-center font-bold text-xl">
+        🏪 역삼1동 프랜차이즈 상권 지도 및 목록
+    </header>
 
-    <div id="map">카카오 지도 영역 (네트워크 차단 시 대체 표시)</div>
-
-    <div class="map-control-bar">
-        <div class="status-indicator" id="status-text">⏳ 백엔드 서버 통신 대기 중...</div>
-    </div>
-
-    <div class="card-grid" id="card-container">
-        <div class="loading-box">🔄 공공데이터 서버에서 실시간 데이터를 가져오는 중입니다...</div>
-    </div>
-</div>
-
-<script>
-    let publicDataset = [];
-    let map = null, clusterer = null, currentOverlay = null;
-    let isKakaoLoaded = false;
-
-// 카카오 스크립트 로드 실패 시 호출되는 함수
-    function handleKakaoError() {
-        console.warn('⚠️ 카카오 지도 스크립트 로드가 차단되었습니다. 지도 기능 없이 상점 목록만 표시합니다.');
-        document.getElementById('map').innerHTML = '⚠️ 네트워크 환경에 의해 카카오 지도가 차단되었습니다. (상점 카드 목록은 정상 이용 가능)';
-        isKakaoLoaded = false;
+    <!-- 메인 컨테이너 -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 flex flex-col md:flex-row gap-4">
         
-        // 지도가 실패하든 말든 데이터 조호는 무조건 실행!
-        fetchDataFromServer(); 
-    }
+        <!-- 좌측: 지도 영역 -->
+        <div class="w-full md:w-1/2 bg-white rounded-lg shadow p-4 flex flex-col">
+            <h2 class="text-lg font-semibold mb-2 text-gray-700">📍 지도 보기</h2>
+            <div id="map" class="w-full h-96 bg-gray-200 rounded-md flex items-center justify-center text-gray-500 text-sm p-4 text-center">
+                지도를 불러오는 중입니다...
+            </div>
+        </div>
 
-    window.onload = function() {
-        // 카카오 스크립트가 정상 로드된 경우
-        if (typeof kakao !== 'undefined' && kakao.maps) {
-            kakao.maps.load(initMap);
-        } else {
-            // 카카오 객체가 없거나 차단된 경우 안전하게 에러 핸들러 호출 후 데이터 로드
-            handleKakaoError();
+        <!-- 우측: 상점 목록 영역 -->
+        <div class="w-full md:w-1/2 bg-white rounded-lg shadow p-4 flex flex-col">
+            <h2 class="text-lg font-semibold mb-2 text-gray-700">📋 상점 목록 (데이터)</h2>
+            <div id="store-list" class="w-full h-96 overflow-y-auto border border-gray-200 rounded-md p-2 space-y-2">
+                <p class="text-gray-400 text-center mt-32">데이터를 불러오는 중입니다...</p>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- 카카오 지도 API 스크립트 로드 실패 시 전역 함수 -->
+    <script>
+        function handleKakaoError() {
+            console.warn('⚠️ 카카오 지도 스크립트 로드가 차단되었습니다.');
+            const mapDiv = document.getElementById('map');
+            mapDiv.innerHTML = '<span class="text-red-500">네트워크 환경에 의해 카카오 지도가 차단되었습니다.<br>(상점 목록 데이터는 정상 조회됩니다)</span>';
         }
-    };
+    </script>
+    <!-- 카카오 지도 SDK (autoload=false 적용) -->
+    <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=4d5aaedcde7f98e5717fef7eb4e1652d&libraries=clusterer,services&autoload=false" onerror="handleKakaoError()"></script>
 
-    function initMap() {
-        try {
-            if (typeof kakao !== 'undefined' && kakao.maps) {
-                isKakaoLoaded = true;
-                const mapContainer = document.getElementById('map');
-                const mapOption = {
-                    center: new kakao.maps.LatLng(37.5045, 127.0485),
-                    level: 5
-                };
-                map = new kakao.maps.Map(mapContainer, mapOption);
+    <!-- 핵심 비즈니스 로직 -->
+    <script>
+        let map = null;
+        let markers = [];
 
-                clusterer = new kakao.maps.MarkerClusterer({
-                    map: map,
-                    averageCenter: true,
-                    minLevel: 6
-                });
+        // 1. 백엔드 서버에서 상점 데이터 가져오기
+        async function fetchStoreData() {
+            const listContainer = document.getElementById('store-list');
+            
+            try {
+                const response = await fetch('/api/franchises');
+                const data = await response.json();
 
-                kakao.maps.event.addListener(map, 'bounds_changed', handleViewportRender);
-            }
-        } catch (e) {
-            console.error('지도 초기화 에러:', e);
-        }
-        fetchDataFromServer();
-    }
+                console.log('서버 응답 데이터:', data);
 
-    async function fetchDataFromServer() {
-        document.getElementById('status-text').innerText = '🌐 백엔드 프록시 서버로 요청 전송 중...';
+                // 공공데이터 응답 구조에 맞게 items 추출 (안전한 옵셔널 체이닝)
+                const items = data?.body?.items || data?.response?.body?.items || [];
 
-        try {
-            const response = await fetch('/api/franchises');
-            const result = await response.json();
-
-            const items = result?.body?.items || [];
-
-            if (items.length === 0) {
-                document.getElementById('status-text').innerText = '⚠️ 수신된 데이터가 없습니다.';
-                document.getElementById('card-container').innerHTML = '<div class="loading-box">데이터를 가져오지 못했습니다.</div>';
-                return;
-            }
-
-            publicDataset = items.map(item => ({
-                name: item.bizesNm,
-                category: item.indsSclsNm || '기타',
-                loc: item.rdnm || item.rdnmAdr || item.lnoAdr || '주소 정보 없음',
-                phone: item.telno || '전화번호 없음',
-                lat: parseFloat(item.lat),
-                lng: parseFloat(item.lon),
-                url: `https://map.kakao.com/link/search/${encodeURIComponent(item.bizesNm)}`
-            })).filter(item => !isNaN(item.lat) && !isNaN(item.lng));
-
-            document.getElementById('status-text').innerText = `✅ 실시간 연동 성공: 총 ${publicDataset.length}개 상점 로드됨`;
-            handleViewportRender();
-
-        } catch (error) {
-            console.error('통신 에러:', error);
-            document.getElementById('status-text').innerText = '❌ 서버 통신 실패';
-            document.getElementById('card-container').innerHTML = '<div class="loading-box">백엔드 서버와 통신하지 못했습니다.</div>';
-        }
-    }
-
-    function handleViewportRender() {
-        renderCards(publicDataset); // 지도가 없어도 카드 목록은 전체 출력되도록 보완
-
-        if (!isKakaoLoaded || !map || publicDataset.length === 0) return;
-        const bounds = map.getBounds();
-
-        const visibleData = publicDataset.filter(item => {
-            const coords = new kakao.maps.LatLng(item.lat, item.lng);
-            return bounds.contain(coords);
-        });
-
-        clusterer.clear();
-        const markers = visibleData.map(item => {
-            const coords = new kakao.maps.LatLng(item.lat, item.lng);
-            const marker = new kakao.maps.Marker({ position: coords });
-
-            const content = document.createElement('div');
-            content.className = 'soft-box-bubble';
-            content.innerHTML = `<strong>${item.name}</strong><br><span style="color:#059669; font-size:11px;">📞 ${item.phone}</span>`;
-            content.onclick = () => window.open(item.url, '_blank');
-
-            const overlay = new kakao.maps.CustomOverlay({
-                position: coords,
-                content: content,
-                yAnchor: 1.3
-            });
-
-            kakao.maps.event.addListener(marker, 'click', () => {
-                if (currentOverlay) currentOverlay.setMap(null);
-                overlay.setMap(map);
-                currentOverlay = overlay;
-            });
-
-            return marker;
-        });
-
-        clusterer.addMarkers(markers);
-    }
-
-    function renderCards(data) {
-        const container = document.getElementById('card-container');
-        container.innerHTML = '';
-
-        if (data.length === 0) {
-            container.innerHTML = '<div class="loading-box">표시할 상권 데이터가 없습니다.</div>';
-            return;
-        }
-
-        data.forEach(item => {
-            const card = document.createElement('div');
-            card.className = 'fran-card';
-            card.onclick = () => window.open(item.url, '_blank');
-
-            card.innerHTML = `
-                <h3>🏢 ${item.name}</h3>
-                <p class="fran-loc">📍 ${item.loc}</p>
-                <p class="fran-phone">📞 ${item.phone}</p>
-            `;
-            container.appendChild(card);
-        });
-    }
-
-    window.onload = function() {
-        // 카카오 스크립트가 정상 로드된 경우
-        if (typeof kakao !== 'undefined' && kakao.maps) {
-            kakao.maps.load(initMap);
-        } else {
-            // 차단 등으로 인해 kakao 객체가 없을 경우 강제로 데이터 로드 실행
-            setTimeout(() => {
-                if (!isKakaoLoaded && document.getElementById('card-container').innerHTML.includes('실시간 데이터를 가져오는 중')) {
-                    handleKakaoError();
+                if (!items || items.length === 0) {
+                    listContainer.innerHTML = '<p class="text-gray-500 text-center mt-32">조회된 상점 데이터가 없습니다.</p>';
+                    return;
                 }
-            }, 1000);
-        }
-    };
-</script>
 
+                // 목록 화면에 뿌려주기
+                renderStoreList(items);
+
+                // 지도가 정상 로드되어 있다면 마커 찍기 시도
+                if (typeof kakao !== 'undefined' && kakao.maps && kakao.maps.load) {
+                    kakao.maps.load(() => {
+                        initMapAndMarkers(items);
+                    });
+                }
+
+            } catch (error) {
+                console.error('데이터 조회 실패:', error);
+                listContainer.innerHTML = '<p class="text-red-500 text-center mt-32">데이터를 불러오는 중 오류가 발생했습니다.</p>';
+            }
+        }
+
+        // 2. 우측 상점 목록 HTML 렌더링
+        function renderStoreList(items) {
+            const listContainer = document.getElementById('store-list');
+            listContainer.innerHTML = ''; // 초기화
+
+            items.forEach(store => {
+                const card = document.createElement('div');
+                card.className = 'p-3 bg-gray-50 hover:bg-blue-50 border border-gray-200 rounded-md transition';
+                card.innerHTML = `
+                    <div class="font-bold text-blue-600">${store.bizesNm || '상호명 없음'}</div>
+                    <div class="text-xs text-gray-500">${store.indsSclsNm || '업종 정보 없음'}</div>
+                    <div class="text-sm text-gray-700 mt-1">📍 ${store.rdnmAdr || store.lnoAdr || '주소 정보 없음'}</div>
+                `;
+                listContainer.appendChild(card);
+            });
+        }
+
+        // 3. 지도 초기화 및 마커 표시
+        function initMapAndMarkers(items) {
+            const mapContainer = document.getElementById('map');
+            
+            // 첫 번째 상점 좌표 기준, 없으면 역삼역 기본 좌표
+            let centerLat = 37.500655;
+            let centerLng = 127.036431;
+
+            const firstWithCoords = items.find(s => s.lat && s.lon);
+            if (firstWithCoords) {
+                centerLat = parseFloat(firstWithCoords.lat);
+                centerLng = parseFloat(firstWithCoords.lon);
+            }
+
+            const options = {
+                center: new kakao.maps.LatLng(centerLat, centerLng),
+                level: 3
+            };
+
+            map = new kakao.maps.Map(mapContainer, options);
+
+            // 상점들 위치에 마커 찍기
+            items.forEach(store => {
+                if (store.lat && store.lon) {
+                    const markerPosition = new kakao.maps.LatLng(parseFloat(store.lat), parseFloat(store.lon));
+                    const marker = new kakao.maps.Marker({
+                        position: markerPosition
+                    });
+                    marker.setMap(map);
+                }
+            });
+        }
+
+        // 페이지 로드 시 데이터 요청 실행 (지도가 막히든 말든 무조건 실행됨)
+        window.onload = function() {
+            fetchStoreData();
+        };
+    </script>
 </body>
 </html>
