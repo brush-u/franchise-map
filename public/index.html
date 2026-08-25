@@ -159,8 +159,14 @@
             <select id="lclsSelect"><option value="">대분류 불러오는 중...</option></select>
             <select id="mclsSelect" disabled><option value="">중분류 선택</option></select>
             <select id="sclsSelect" disabled><option value="">소분류 (전체)</option></select>
+            <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:#495057;">
+                <input type="checkbox" id="franchiseOnlyCheck"> 프랜차이즈만 보기
+            </label>
             <button id="loadBtn">상권 데이터 불러오기</button>
         </div>
+        <p style="text-align:center; font-size:11px; color:#adb5bd; margin-top:-4px; margin-bottom:18px;">
+            ⓘ "프랜차이즈만 보기"는 지점명(brchNm)이 등록된 항목만 남기는 근사 필터입니다. 원본 데이터에 프랜차이즈 여부 필드는 없습니다.
+        </p>
 
         <div id="map"></div>
         <div id="mapStatus"></div>
@@ -367,6 +373,7 @@
                 qs = new URLSearchParams({ indsLclsCd });
                 if (mclsSelect.value) qs.set('indsMclsCd', mclsSelect.value);
                 if (sclsSelect.value) qs.set('indsSclsCd', sclsSelect.value);
+                if (document.getElementById('franchiseOnlyCheck').checked) qs.set('franchiseOnly', '1');
             }
 
             loadingEl.style.display = 'block';
