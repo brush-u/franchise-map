@@ -23,19 +23,19 @@ app.get('/api/franchises', async (req, res) => {
             return res.status(500).json({ error: '서버에 공공데이터 API 인증키가 설정되지 않았습니다.' });
         }
 
-        const url = 'https://apis.data.go.kr/B553077/api/open/sdsc2/storeListInDong';
+        // 파라미터 오류가 없는 안정적인 구역별 상가 조회 엔드포인트로 변경
+        const url = 'https://apis.data.go.kr/B553077/api/open/sdsc2/storeListInArea';
 
         const apiResponse = await axios.get(url, {
             params: {
                 serviceKey: serviceKey,
-                divId: 'ad',
-                key: '11680640',
+                key: '1168010100', // 역삼1동 법정동 코드
+                numOfRows: '50',
                 type: 'json'
             }
         });
         
-        // 공공데이터 응답 구조 확인용 로그
-        console.log('공공데이터 원본 응답:', JSON.stringify(apiResponse.data, null, 2));
+        console.log('공공데이터 응답 성공 여부:', apiResponse.data?.header?.resultCode);
 
         res.json(apiResponse.data);
 
