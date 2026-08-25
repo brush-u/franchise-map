@@ -15,7 +15,7 @@ app.use(express.json());
 // 정적 파일 서빙 (public 폴더)
 app.use(express.static(path.join(__dirname, 'public')));
 
-// 공공데이터 프록시 엔드포인트
+// 공공데이터 프록시 엔드포인트 (구역별 상가 조회 API)
 app.get('/api/franchises', async (req, res) => {
     try {
         const serviceKey = process.env.PUBLIC_API_KEY;
@@ -25,15 +25,14 @@ app.get('/api/franchises', async (req, res) => {
             return res.status(500).json({ error: '서버에 공공데이터 API 인증키가 설정되지 않았습니다.' });
         }
 
-        // 소상공인 상권정보 API 엔드포인트
-        const url = 'https://apis.data.go.kr/B553077/api/open/sdsc2/storeListInDong';
+        // 구역별 상가정보 조회 엔드포인트
+        const url = 'https://apis.data.go.kr/B553077/api/open/sdsc2/storeListInArea';
 
-        // INVALID_REQUEST_PARAMETER_ERROR 방지를 위해 필수 파라미터만 깔끔하게 구성
         const apiResponse = await axios.get(url, {
             params: {
                 serviceKey: serviceKey,
-                divId: 'ad',          // 행정동 구분 코드 (ad: 행정동)
-                key: '11680640',      // 역삼1동 행정동 코드
+                key: '1168010100',  // 역삼1동 법정동 코드
+                numOfRows: '50',
                 type: 'json'
             }
         });
