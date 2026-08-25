@@ -52,7 +52,6 @@
     <!-- 핵심 비즈니스 로직 -->
     <script>
         let map = null;
-        let markers = [];
 
         // 1. 백엔드 서버에서 상점 데이터 가져오기
         async function fetchStoreData() {
@@ -64,7 +63,7 @@
 
                 console.log('서버 응답 데이터:', data);
 
-                // 공공데이터 응답 구조에 맞게 items 추출 (안전한 옵셔널 체이닝)
+                // 공공데이터 응답 구조에 맞게 items 추출
                 const items = data?.body?.items || data?.response?.body?.items || [];
 
                 if (!items || items.length === 0) {
@@ -109,7 +108,6 @@
         function initMapAndMarkers(items) {
             const mapContainer = document.getElementById('map');
             
-            // 첫 번째 상점 좌표 기준, 없으면 역삼역 기본 좌표
             let centerLat = 37.500655;
             let centerLng = 127.036431;
 
@@ -126,7 +124,6 @@
 
             map = new kakao.maps.Map(mapContainer, options);
 
-            // 상점들 위치에 마커 찍기
             items.forEach(store => {
                 if (store.lat && store.lon) {
                     const markerPosition = new kakao.maps.LatLng(parseFloat(store.lat), parseFloat(store.lon));
@@ -138,7 +135,7 @@
             });
         }
 
-        // 페이지 로드 시 데이터 요청 실행 (지도가 막히든 말든 무조건 실행됨)
+        // 페이지 로드 시 데이터 요청 실행
         window.onload = function() {
             fetchStoreData();
         };
