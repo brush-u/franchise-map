@@ -3,142 +3,336 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>프랜차이즈 상권 지도</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>소상공인 상권 및 프랜차이즈 정보 조회</title>
     <style>
-        body { font-family: 'Malgun Gothic', sans-serif; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+            color: #333;
+        }
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+        h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            color: #2c3e50;
+            text-align: center;
+        }
+        .search-box {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        select {
+            padding: 10px 14px;
+            border-radius: 6px;
+            border: 1px solid #ced4da;
+            font-size: 14px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #map {
+            width: 100%;
+            height: 420px;
+            border-radius: 10px;
+            margin-bottom: 24px;
+            background: #eef1f4;
+        }
+        #mapStatus {
+            text-align: center;
+            font-size: 13px;
+            color: #6c757d;
+            margin: -14px 0 18px;
+        }
+        .layout {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+        #resultList {
+            flex: 1;
+            max-height: 480px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+        .store-card {
+            background: #fff;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 15px 20px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+        }
+        .store-card:hover, .store-card.active {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.08);
+            border-color: #007bff;
+        }
+        .store-name {
+            font-size: 16px;
+            font-weight: bold;
+            color: #007bff;
+            margin-bottom: 6px;
+        }
+        .store-info {
+            font-size: 13px;
+            color: #6c757d;
+            margin-bottom: 4px;
+        }
+        .no-coord-badge {
+            display: inline-block;
+            font-size: 11px;
+            color: #dc3545;
+            border: 1px solid #dc3545;
+            border-radius: 4px;
+            padding: 1px 5px;
+            margin-left: 6px;
+        }
+        .loading {
+            text-align: center;
+            color: #6c757d;
+            font-size: 16px;
+            margin: 30px 0;
+        }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen flex flex-col">
+<body>
 
-    <!-- 상단 헤더 -->
-    <header class="bg-blue-600 text-white shadow-md p-4 text-center font-bold text-xl">
-        🏪 역삼1동 프랜차이즈 상권 지도 및 목록
-    </header>
+    <div class="container">
+        <h1>☕ 상권 및 프랜차이즈 정보 조회</h1>
 
-    <!-- 메인 컨테이너 -->
-    <main class="flex-1 max-w-7xl w-full mx-auto p-4 flex flex-col md:flex-row gap-4">
-        
-        <!-- 좌측: 지도 영역 -->
-        <div class="w-full md:w-1/2 bg-white rounded-lg shadow p-4 flex flex-col">
-            <h2 class="text-lg font-semibold mb-2 text-gray-700">📍 지도 보기</h2>
-            <div id="map" class="w-full h-96 bg-gray-200 rounded-md flex items-center justify-center text-gray-500 text-sm p-4 text-center">
-                지도를 불러오는 중입니다...
-            </div>
+        <div class="search-box">
+            <select id="indsSelect">
+                <option value="Q,Q12,Q12A01">커피숍/카페 (검증됨)</option>
+                <option value="Q,Q05,Q05A08">치킨전문점 (검증됨)</option>
+                <option value="custom">직접 입력...</option>
+            </select>
+            <span id="customCodesBox" style="display:none; gap:6px;">
+                <input id="customLcls" placeholder="대분류 (예: D1)" style="width:110px; padding:9px; border-radius:6px; border:1px solid #ced4da;">
+                <input id="customMcls" placeholder="중분류 (예: D110)" style="width:110px; padding:9px; border-radius:6px; border:1px solid #ced4da;">
+                <input id="customScls" placeholder="소분류 (선택)" style="width:110px; padding:9px; border-radius:6px; border:1px solid #ced4da;">
+            </span>
+            <button id="loadBtn">상권 데이터 불러오기</button>
         </div>
+        <p style="text-align:center; font-size:12px; color:#adb5bd; margin-top:-14px; margin-bottom:20px;">
+            업종코드는 공공데이터포털 "소상공인시장진흥공단_상가(상권)정보" 상세페이지의 업종코드 파일에서 확인할 수 있습니다.
+        </p>
 
-        <!-- 우측: 상점 목록 영역 -->
-        <div class="w-full md:w-1/2 bg-white rounded-lg shadow p-4 flex flex-col">
-            <h2 class="text-lg font-semibold mb-2 text-gray-700">📋 상점 목록 (데이터)</h2>
-            <div id="store-list" class="w-full h-96 overflow-y-auto border border-gray-200 rounded-md p-2 space-y-2">
-                <p class="text-gray-400 text-center mt-32">데이터를 불러오는 중입니다...</p>
-            </div>
+        <div id="map"></div>
+        <div id="mapStatus"></div>
+
+        <div id="loading" class="loading" style="display: none;">데이터를 불러오는 중입니다...</div>
+
+        <div class="layout">
+            <div id="resultList"></div>
         </div>
+    </div>
 
-    </main>
-
-    <!-- 카카오 지도 API 스크립트 로드 실패 시 전역 함수 -->
     <script>
-        function handleKakaoError() {
-            console.warn('⚠️ 카카오 지도 스크립트 로드가 차단되었습니다.');
-            const mapDiv = document.getElementById('map');
-            mapDiv.innerHTML = '<span class="text-red-500">네트워크 환경에 의해 카카오 지도가 차단되었습니다.<br>(상점 목록 데이터는 정상 조회됩니다)</span>';
-        }
-    </script>
-    <!-- 카카오 지도 SDK (autoload=false 적용) -->
-    <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=4d5aaedcde7f98e5717fef7eb4e1652d&libraries=clusterer,services&autoload=false" onerror="handleKakaoError()"></script>
+        const DEFAULT_CENTER = { lat: 37.4979, lng: 127.0276 }; // 강남역 인근 기본 좌표
 
-    <!-- 핵심 비즈니스 로직 -->
-    <script>
         let map = null;
+        let markers = [];
+        let infoWindow = null;
+        let kakaoReady = false;
 
-        // 1. 백엔드 서버에서 상점 데이터 가져오기
-        async function fetchStoreData() {
-            const listContainer = document.getElementById('store-list');
-            
+        document.getElementById('loadBtn').addEventListener('click', fetchStores);
+        document.getElementById('indsSelect').addEventListener('change', (e) => {
+            document.getElementById('customCodesBox').style.display = e.target.value === 'custom' ? 'inline-flex' : 'none';
+        });
+
+        // 1) 서버에서 Kakao JS 키를 받아온 뒤 SDK를 동적으로 로드한다.
+        async function initMap() {
+            const statusEl = document.getElementById('mapStatus');
             try {
-                const response = await fetch('/api/franchises');
-                const data = await response.json();
+                const res = await fetch('/api/config');
+                const { kakaoJsKey } = await res.json();
 
-                console.log('서버 응답 데이터:', data);
-
-                // 공공데이터 응답 구조에 맞게 items 추출
-                const items = data?.body?.items || data?.response?.body?.items || [];
-
-                if (!items || items.length === 0) {
-                    listContainer.innerHTML = '<p class="text-gray-500 text-center mt-32">조회된 상점 데이터가 없습니다.</p>';
+                if (!kakaoJsKey) {
+                    statusEl.textContent = '⚠️ 지도를 표시하려면 서버 .env에 KAKAO_JS_KEY를 설정해야 합니다. (Kakao Developers에서 발급, 사용 도메인 등록 필요)';
                     return;
                 }
 
-                // 목록 화면에 뿌려주기
-                renderStoreList(items);
-
-                // 지도가 정상 로드되어 있다면 마커 찍기 시도
-                if (typeof kakao !== 'undefined' && kakao.maps && kakao.maps.load) {
+                const script = document.createElement('script');
+                script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${kakaoJsKey}&autoload=false`;
+                script.onload = () => {
                     kakao.maps.load(() => {
-                        initMapAndMarkers(items);
+                        map = new kakao.maps.Map(document.getElementById('map'), {
+                            center: new kakao.maps.LatLng(DEFAULT_CENTER.lat, DEFAULT_CENTER.lng),
+                            level: 5,
+                        });
+                        infoWindow = new kakao.maps.InfoWindow({ zIndex: 1 });
+                        kakaoReady = true;
+                        statusEl.textContent = '';
+                        // 지도 준비되면 기본 데이터 자동 로드
+                        fetchStores();
                     });
+                };
+                script.onerror = () => {
+                    statusEl.textContent = '⚠️ Kakao 지도 SDK 로드에 실패했습니다. appkey 및 도메인 등록 상태를 확인하세요.';
+                };
+                document.head.appendChild(script);
+            } catch (err) {
+                statusEl.textContent = '⚠️ 지도 설정을 불러오지 못했습니다.';
+                console.error(err);
+            }
+        }
+
+        function clearMarkers() {
+            markers.forEach((m) => m.setMap(null));
+            markers = [];
+        }
+
+        // markers는 items 배열과 같은 길이로 유지하되, 좌표 없는 항목은 null로 채워서
+        // "카드 클릭 -> 해당 마커" 매핑이 인덱스로 항상 정확히 맞도록 한다.
+        function plotOnMap(items) {
+            if (!kakaoReady) return { markersByIndex: [], plotted: 0 };
+            clearMarkers();
+
+            const bounds = new kakao.maps.LatLngBounds();
+            const markersByIndex = new Array(items.length).fill(null);
+            let plotted = 0;
+
+            items.forEach((store, idx) => {
+                const lat = parseFloat(store.lat);
+                const lon = parseFloat(store.lon);
+                if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+
+                const position = new kakao.maps.LatLng(lat, lon);
+                const marker = new kakao.maps.Marker({ position, map });
+
+                kakao.maps.event.addListener(marker, 'click', () => {
+                    infoWindow.setContent(
+                        `<div style="padding:8px 10px;font-size:13px;min-width:160px;">
+                            <strong>${escapeHtml(store.bizesNm || '상호명 없음')}</strong><br/>
+                            ${escapeHtml(store.rdnmAdr || store.jibunAdr || '')}
+                        </div>`
+                    );
+                    infoWindow.open(map, marker);
+                });
+
+                markers.push(marker);
+                markersByIndex[idx] = marker;
+                bounds.extend(position);
+                plotted++;
+            });
+
+            if (plotted > 0) {
+                map.setBounds(bounds);
+            }
+            return { markersByIndex, plotted };
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        async function fetchStores() {
+            const loadingEl = document.getElementById('loading');
+            const resultListEl = document.getElementById('resultList');
+            const statusEl = document.getElementById('mapStatus');
+            const selectVal = document.getElementById('indsSelect').value;
+
+            let indsLclsCd, indsMclsCd, indsSclsCd;
+            if (selectVal === 'custom') {
+                indsLclsCd = document.getElementById('customLcls').value.trim();
+                indsMclsCd = document.getElementById('customMcls').value.trim();
+                indsSclsCd = document.getElementById('customScls').value.trim();
+                if (!indsLclsCd) {
+                    resultListEl.innerHTML = '<p style="text-align:center;color:#dc3545;">대분류 코드는 필수입니다.</p>';
+                    return;
                 }
+            } else {
+                [indsLclsCd, indsMclsCd, indsSclsCd] = selectVal.split(',');
+            }
+
+            loadingEl.style.display = 'block';
+            resultListEl.innerHTML = '';
+
+            try {
+                const qs = new URLSearchParams({ indsLclsCd });
+                if (indsMclsCd) qs.set('indsMclsCd', indsMclsCd);
+                if (indsSclsCd) qs.set('indsSclsCd', indsSclsCd);
+
+                const response = await fetch(`/api/franchises?${qs.toString()}`);
+                const data = await response.json();
+
+                loadingEl.style.display = 'none';
+
+                const items = data.body?.items || [];
+
+                if (items.length === 0) {
+                    resultListEl.innerHTML = '<p style="text-align: center; color: #6c757d;">조회된 데이터가 없습니다.</p>';
+                    return;
+                }
+
+                const { markersByIndex, plotted } = kakaoReady ? plotOnMap(items) : { markersByIndex: [], plotted: 0 };
+                if (kakaoReady) {
+                    const missing = items.length - plotted;
+                    statusEl.textContent = missing > 0
+                        ? `지도에 ${plotted}개 표시됨 (좌표 없는 ${missing}개 제외)`
+                        : `지도에 ${plotted}개 표시됨`;
+                }
+
+                items.forEach((store, idx) => {
+                    const hasCoord = Number.isFinite(parseFloat(store.lat)) && Number.isFinite(parseFloat(store.lon));
+                    const card = document.createElement('div');
+                    card.className = 'store-card';
+                    card.innerHTML = `
+                        <div class="store-name">${store.bizesNm || '상호명 없음'}${hasCoord ? '' : '<span class="no-coord-badge">좌표없음</span>'}</div>
+                        <div class="store-info">🏷️ 업종: ${store.indsSclsNm || '정보 없음'}</div>
+                        <div class="store-info">📍 주소: ${store.rdnmAdr || store.jibunAdr || '주소 정보 없음'}</div>
+                    `;
+
+                    if (hasCoord && kakaoReady) {
+                        card.addEventListener('click', () => {
+                            const lat = parseFloat(store.lat);
+                            const lon = parseFloat(store.lon);
+                            map.panTo(new kakao.maps.LatLng(lat, lon));
+                            const marker = markersByIndex[idx];
+                            if (marker) {
+                                kakao.maps.event.trigger(marker, 'click');
+                            }
+                        });
+                    }
+
+                    resultListEl.appendChild(card);
+                });
 
             } catch (error) {
-                console.error('데이터 조회 실패:', error);
-                listContainer.innerHTML = '<p class="text-red-500 text-center mt-32">데이터를 불러오는 중 오류가 발생했습니다.</p>';
+                loadingEl.style.display = 'none';
+                resultListEl.innerHTML = '<p style="text-align: center; color: #dc3545;">데이터를 불러오는 중 오류가 발생했습니다.</p>';
+                console.error('Fetch error:', error);
             }
         }
 
-        // 2. 우측 상점 목록 HTML 렌더링
-        function renderStoreList(items) {
-            const listContainer = document.getElementById('store-list');
-            listContainer.innerHTML = ''; // 초기화
-
-            items.forEach(store => {
-                const card = document.createElement('div');
-                card.className = 'p-3 bg-gray-50 hover:bg-blue-50 border border-gray-200 rounded-md transition';
-                card.innerHTML = `
-                    <div class="font-bold text-blue-600">${store.bizesNm || '상호명 없음'}</div>
-                    <div class="text-xs text-gray-500">${store.indsSclsNm || '업종 정보 없음'}</div>
-                    <div class="text-sm text-gray-700 mt-1">📍 ${store.rdnmAdr || store.lnoAdr || '주소 정보 없음'}</div>
-                `;
-                listContainer.appendChild(card);
-            });
-        }
-
-        // 3. 지도 초기화 및 마커 표시
-        function initMapAndMarkers(items) {
-            const mapContainer = document.getElementById('map');
-            
-            let centerLat = 37.500655;
-            let centerLng = 127.036431;
-
-            const firstWithCoords = items.find(s => s.lat && s.lon);
-            if (firstWithCoords) {
-                centerLat = parseFloat(firstWithCoords.lat);
-                centerLng = parseFloat(firstWithCoords.lon);
-            }
-
-            const options = {
-                center: new kakao.maps.LatLng(centerLat, centerLng),
-                level: 3
-            };
-
-            map = new kakao.maps.Map(mapContainer, options);
-
-            items.forEach(store => {
-                if (store.lat && store.lon) {
-                    const markerPosition = new kakao.maps.LatLng(parseFloat(store.lat), parseFloat(store.lon));
-                    const marker = new kakao.maps.Marker({
-                        position: markerPosition
-                    });
-                    marker.setMap(map);
-                }
-            });
-        }
-
-        // 페이지 로드 시 데이터 요청 실행
-        window.onload = function() {
-            fetchStoreData();
-        };
+        initMap();
     </script>
+
 </body>
 </html>
