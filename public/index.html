@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>반경 내 음식점 그룹별 조회 지도</title>
-    <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=__KAKAO_API_KEY__"></script>
+    <!-- 카카오 지도 SDK (services 라이브러리 추가: 주소 변환용) -->
+    <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=__KAKAO_API_KEY__&libraries=services"></script>
     <style>
         body { margin: 0; padding: 0; font-family: 'Malgun Gothic', sans-serif; display: flex; height: 100vh; overflow: hidden; }
         #map { flex: 2; height: 100%; position: relative; }
@@ -74,7 +75,6 @@
         .store-info { font-size: 12px; color: #555; margin-bottom: 2px; }
         .store-category { font-size: 11px; color: #0066ff; font-weight: bold; margin-top: 4px; }
         
-        /* 🔥 인기 추천 뱃지 스타일 */
         .popular-badge {
             background: linear-gradient(135deg, #ff416c, #ff4b2b);
             color: white;
@@ -90,7 +90,7 @@
             vertical-align: middle;
         }
 
-        .guide-text { padding: 8px 15px; background: #e0f2fe; color: #0369a1; font-size: 12px; border-bottom: 1px solid #bae6fd; }
+        .guide-text { padding: 8px 15px; background: #e0f2fe; color: #0369a1; font-size: 12px; border-bottom: 1px solid #bae6fd; line-height: 1.4; }
 
         @media (max-width: 768px) {
             body { flex-direction: column; height: 100vh; position: relative; }
@@ -134,7 +134,7 @@
             <span>🍽️ 반경 내 음식점 조회</span>
             <button id="global-toggle-btn" class="global-toggle-btn">모두 접기</button>
         </div>
-        <div class="guide-text" id="guide-text-msg">💡 현재 위치 기준 500m 내 식당을 불러옵니다.</div>
+        <div class="guide-text" id="guide-text-msg">💡 지도를 클릭하거나 위치를 이동하여 중심점을 지정하세요.</div>
         
         <div class="search-control-container">
             <div class="search-row">
@@ -239,8 +239,12 @@
             };
             const map = new kakao.maps.Map(container, options);
 
+            // 주소 변환을 위한 Geocoder 서비스 객체 생성
+            const geocoder = new kakao.maps.services.Geocoder();
+
             let centerMarker = null;
             let centerCircle = null;
+            let centerInfoWindow = null;
             let currentMarkers = []; 
             let pinnedInfoWindow = null; 
             let currentStores = []; 
@@ -265,13 +269,20 @@
                 globalToggleBtn.innerText = isAllCollapsed ? '모두 펼치기' : '모두 접기';
             };
 
-            function updateGuideText(r) {
+            function updateGuideText(r, addressName) {
                 const guideEl = document.getElementById('guide-text-msg');
-                if (r >= 1000) {
-                    guideEl.innerHTML = `💡 현재 위치 기준 ${(r / 1000).toFixed(1).replace(/\.0$/, '')}km 내 식당을 불러옵니다.`;
+                let rangeStr = r >= 1000 ? `${(r / 1000).toFixed(1).replace(/\.0$/, '')}km` : `${r}m`;
+                
+                if (addressName) {
+                    guideEl.innerHTML = `📍 <strong>중심 위치:</strong> ${addressName}<br>💡 반경 <strong>${rangeStr}</strong> 내 식당을 불러오는 중...`;
                 } else {
-                    guideEl.innerHTML = `💡 현재 위치 기준 ${r}m 내 식당을 불러옵니다.`;
+                    guideEl.innerHTML = `💡 현재 위치 기준 ${rangeStr} 내 식당을 불러옵니다.`;
                 }
+            }
+
+            // 좌표를 주소로 변환하는 함수
+            function searchDetailAddrFromCoords(coords, callback) {
+                geocoder.coord2Address(coords.getLng(), coords.getLat(), callback);
             }
 
             function getMapSearchUrl(platform, name, address) {
@@ -330,11 +341,10 @@
                 return hash;
             }
 
-            // 🌟 인기 추천 여부 판단 함수 (거리 200m 이내 이거나 고유 해시값이 특정 조건에 맞는 매장)
             function isPopularStore(store, distanceMeters) {
-                if (distanceMeters <= 200) return true; // 중심지에서 200m 이내인 매장은 맛집으로 선정
+                if (distanceMeters <= 200) return true;
                 const hashVal = Math.abs(hashCode(store.bizesId || store.bizesNm || ''));
-                return (hashVal % 5 === 0); // 전체 중 약 20% 확률로 인기 맛집 선정
+                return (hashVal % 5 === 0);
             }
 
             function getFoodCategory(indsName, indsLargeName, storeName) {
@@ -435,9 +445,7 @@
 
                     const distanceMeters = getDistanceFromLatLonInMeters(centerLat, centerLng, storeLat, storeLon);
                     store.distanceMeters = distanceMeters;
-                    
-                    const isPopular = isPopularStore(store, distanceMeters);
-                    store.isPopular = isPopular;
+                    store.isPopular = isPopularStore(store, distanceMeters);
 
                     if (storeLat && storeLon) {
                         const markerPosition = new kakao.maps.LatLng(storeLat, storeLon);
@@ -445,8 +453,7 @@
                         marker.setMap(map);
 
                         const mapUrl = getMapSearchUrl(selectedPlatform, name, address);
-                        const platformName = selectedPlatform === 'naver' ? '네이버' : (selectedPlatform === 'google' ? '구글' : '카카오');
-                        const badgeHtml = isPopular ? `<span style="background:#ff4b2b; color:white; font-size:10px; padding:1px 4px; border-radius:4px; font-weight:bold; margin-left:4px;">🔥 인기추천</span>` : '';
+                        const badgeHtml = store.isPopular ? `<span style="background:#ff4b2b; color:white; font-size:10px; padding:1px 4px; border-radius:4px; font-weight:bold; margin-left:4px;">🔥 인기추천</span>` : '';
                         
                         const infowindowContent = `
                             <div style="padding:10px; font-size:12px; width:220px; line-height:1.4;">
@@ -510,7 +517,6 @@
                     section.appendChild(titleDiv);
                     section.appendChild(contentDiv);
 
-                    // 인기 매장이 상단에 오도록 정렬 후 거리순 정렬
                     storeList.sort((a, b) => {
                         if (a.isPopular !== b.isPopular) return b.isPopular - a.isPopular;
                         return a.distanceMeters - b.distanceMeters;
@@ -623,6 +629,7 @@
             function updateCenterMarker(latlng) {
                 if (centerMarker) centerMarker.setMap(null);
                 if (centerCircle) centerCircle.setMap(null);
+                if (centerInfoWindow) centerInfoWindow.close();
 
                 const imageSrc = 'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_red.png';
                 const imageSize = new kakao.maps.Size(40, 42);
@@ -645,6 +652,28 @@
                     fillOpacity: 0.2
                 });
                 centerCircle.setMap(map);
+
+                // 좌표를 주소로 변환하여 가이드 텍스트와 중심 마커 인포윈도우에 표시
+                searchDetailAddrFromCoords(latlng, function(result, status) {
+                    if (status === kakao.maps.services.Status.OK) {
+                        let detailAddr = result[0].road_address ? result[0].road_address.address_name : '';
+                        let jibunAddr = result[0].address ? result[0].address.address_name : '';
+                        let fullAddress = detailAddr || jibunAddr || '주소 정보 없음';
+
+                        updateGuideText(radius, fullAddress);
+
+                        centerInfoWindow = new kakao.maps.InfoWindow({
+                            content: `<div style="padding:8px 12px; font-size:12px; font-weight:bold; color:#d32f2f;">📍 선택된 중심 위치<br><span style="font-weight:normal; color:#333;">${fullAddress}</span></div>`,
+                            removable: true
+                        });
+
+                        kakao.maps.event.addListener(centerMarker, 'click', function() {
+                            centerInfoWindow.open(map, centerMarker);
+                        });
+                    } else {
+                        updateGuideText(radius, '위치 주소 확인 불가');
+                    }
+                });
             }
 
             document.getElementById('current-location-btn').onclick = function() {
@@ -662,7 +691,6 @@
 
                         const currentLatLng = new kakao.maps.LatLng(centerLat, centerLng);
                         map.setCenter(currentLatLng);
-                        updateGuideText(radius);
                         updateCenterMarker(currentLatLng);
                         loadStores(centerLat, centerLng);
                     },
@@ -679,7 +707,6 @@
                 if (newLevel !== currentLevel) {
                     currentLevel = newLevel;
                     radius = getRadiusByLevel(currentLevel);
-                    updateGuideText(radius);
                     
                     const fixedLatLng = new kakao.maps.LatLng(centerLat, centerLng);
                     updateCenterMarker(fixedLatLng);
@@ -710,14 +737,12 @@
 
                         const currentLatLng = new kakao.maps.LatLng(centerLat, centerLng);
                         map.setCenter(currentLatLng);
-                        updateGuideText(radius);
                         updateCenterMarker(currentLatLng);
                         loadStores(centerLat, centerLng);
                     },
                     function(error) {
                         console.warn('현재 위치를 가져올 수 없어 기본 위치(서울시청)로 대체합니다.', error);
                         const defaultLatLng = new kakao.maps.LatLng(centerLat, centerLng);
-                        updateGuideText(radius);
                         updateCenterMarker(defaultLatLng);
                         loadStores(centerLat, centerLng);
                     },
@@ -725,7 +750,6 @@
                 );
             } else {
                 const defaultLatLng = new kakao.maps.LatLng(centerLat, centerLng);
-                updateGuideText(radius);
                 updateCenterMarker(defaultLatLng);
                 loadStores(centerLat, centerLng);
             }
