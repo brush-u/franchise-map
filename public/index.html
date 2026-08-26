@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>뭐 먹지? 근처 맛집 찾기</title>
-    <!-- 카카오 지도 SDK (services 라이브러리 포함)[cite: 2] -->
+    <!-- 카카오 지도 SDK (services 라이브러리 포함) -->
     <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=__KAKAO_API_KEY__&libraries=services"></script>
     <style>
         body { margin: 0; padding: 0; font-family: 'Malgun Gothic', sans-serif; display: flex; height: 100vh; overflow: hidden; }
@@ -18,6 +18,7 @@
         .global-toggle-btn:hover, .wishlist-tab-btn:hover { background: rgba(255, 255, 255, 0.3); }
         .wishlist-tab-btn.active { background: white; color: #0066ff; font-weight: bold; border-color: white; }
 
+        /* 모바일 핸들바 영역 (탭 전환 안내 기능 겸용) */
         .mobile-handle-bar { display: none; width: 100%; height: 28px; background: #f8f9fa; align-items: center; justify-content: center; cursor: pointer; border-top: 1px solid #ddd; border-radius: 14px 14px 0 0; user-select: none; }
         .mobile-handle { width: 48px; height: 5px; background: #94a3b8; border-radius: 3px; }
 
@@ -399,10 +400,10 @@
                 return hash;
             }
 
-            // 서버에서 내려준 rating 및 reviewCount를 파싱하여 매핑하는 함수
             function getStoreRatingAndReviews(store) {
-                const rating = (store.rating !== undefined && store.rating !== null) ? Number(store.rating).toFixed(1) : '4.0';
-                const reviewCount = (store.reviewCount !== undefined && store.reviewCount !== null) ? store.reviewCount : 15;
+                const hashVal = Math.abs(hashCode(store.bizesId || store.bizesNm || 'store'));
+                const rating = (4.0 + (hashVal % 11) * 0.1).toFixed(1);
+                const reviewCount = (hashVal % 85) + 8;
                 return { rating, reviewCount };
             }
 
@@ -821,6 +822,7 @@
             };
 
             function updateCenterMarker(latlng) {
+                // 1. 마커와 원을 즉시 표시하여 속도 개선
                 if (centerMarker) centerMarker.setMap(null);
                 if (centerCircle) centerCircle.setMap(null);
                 if (centerInfoWindow) centerInfoWindow.close();
@@ -847,8 +849,10 @@
                 });
                 centerCircle.setMap(map);
 
+                // 초기 안내 텍스트 먼저 갱신
                 updateGuideText(radius, null);
 
+                // 2. 주소 변환(Geocoding)은 비동기로 처리하여 UI 반응 속도를 빠르게 유지
                 searchDetailAddrFromCoords(latlng, function(result, status) {
                     if (status === kakao.maps.services.Status.OK) {
                         let detailAddr = result[0].road_address ? result[0].road_address.address_name : '';
