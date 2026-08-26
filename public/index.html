@@ -9,8 +9,13 @@
         body { margin: 0; padding: 0; font-family: 'Malgun Gothic', sans-serif; display: flex; height: 100vh; overflow: hidden; }
         #map { flex: 2; height: 100%; }
         #sidebar { flex: 1; height: 100%; background: #f8f9fa; border-left: 1px solid #ddd; display: flex; flex-direction: column; }
+        
         .sidebar-header { padding: 15px 20px; background: #0066ff; color: white; font-size: 18px; font-weight: bold; display: flex; align-items: center; justify-content: space-between; }
         
+        /* 모바일 드래그 핸들 (PC에서는 숨김) */
+        .mobile-handle-bar { display: none; width: 100%; height: 20px; background: #f8f9fa; align-items: center; justify-content: center; cursor: ns-resize; border-top: 1px solid #ddd; border-radius: 12px 12px 0 0; }
+        .mobile-handle { width: 40px; height: 4px; background: #cbd5e1; border-radius: 2px; }
+
         .search-control-container { padding: 12px 15px; background: #ffffff; border-bottom: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 8px; }
         .search-row { display: flex; gap: 8px; }
         .search-input { flex: 1; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; outline: none; }
@@ -28,7 +33,6 @@
         .group-title:hover { color: #0066ff; }
         .group-count { background: #0066ff; color: white; font-size: 11px; padding: 2px 6px; border-radius: 10px; }
         
-        /* 그룹 토글 내용 영역 */
         .group-content { display: flex; flex-direction: column; gap: 8px; transition: max-height 0.3s ease; }
         .group-content.collapsed { display: none; }
 
@@ -40,10 +44,27 @@
         .store-category { font-size: 11px; color: #0066ff; font-weight: bold; margin-top: 4px; }
         .guide-text { padding: 8px 15px; background: #e0f2fe; color: #0369a1; font-size: 12px; border-bottom: 1px solid #bae6fd; }
 
+        /* 모바일 화면 최적화 스타일 */
         @media (max-width: 768px) {
-            body { flex-direction: column; height: 100vh; }
-            #map { flex: none; height: 45vh; width: 100%; }
-            #sidebar { flex: 1; height: 55vh; width: 100%; border-left: none; border-top: 1px solid #ddd; }
+            body { flex-direction: column; height: 100vh; position: relative; }
+            #map { width: 100%; height: 100%; flex: none; position: absolute; top: 0; left: 0; z-index: 1; }
+            
+            #sidebar { 
+                position: absolute; 
+                bottom: 0; 
+                left: 0; 
+                width: 100%; 
+                height: 40vh; /* 기본 높이 */
+                max-height: 90vh; 
+                min-height: 12vh; 
+                z-index: 10; 
+                border-left: none; 
+                border-top: 1px solid #ddd;
+                box-shadow: 0 -4px 10px rgba(0,0,0,0.1);
+                border-radius: 16px 16px 0 0;
+                transition: height 0.1s ease-out;
+            }
+            .mobile-handle-bar { display: flex; }
         }
     </style>
 </head>
@@ -52,10 +73,14 @@
     <div id="map"></div>
 
     <div id="sidebar">
+        <!-- 모바일 터치 드래그 핸들 바 -->
+        <div class="mobile-handle-bar" id="drag-handle">
+            <div class="mobile-handle"></div>
+        </div>
+
         <div class="sidebar-header">
             <span>🍽️ 반경 내 음식점 조회</span>
         </div>
-        <!-- 동적으로 변경되는 안내 문구 -->
         <div class="guide-text" id="guide-text-msg">💡 현재 위치 기준 500m 내 식당을 불러옵니다.</div>
         
         <div class="search-control-container">
@@ -80,6 +105,63 @@
 
     <script>
         window.onload = function() {
+            // 모바일 드래그로 높이 조절 기능 구현
+            const sidebar = document.getElementById('sidebar');
+            const dragHandle = document.getElementById('drag-handle');
+            let isDragging = false;
+            let startY = 0;
+            let startHeight = 0;
+
+            dragHandle.addEventListener('touchstart', (e) => {
+                isDragging = true;
+                startY = e.touches[0].clientY;
+                startHeight = sidebar.offsetHeight;
+                e.preventDefault();
+            });
+
+            window.addEventListener('touchmove', (e) => {
+                if (!isDragging) return;
+                const deltaY = startY - e.touches[0].clientY; // 위로 올리면 커지고, 아래로 내리면 작아짐
+                let newHeight = startHeight + deltaY;
+                const maxHeight = window.innerHeight * 0.9;
+                const minHeight = window.innerHeight * 0.12;
+
+                if (newHeight > maxHeight) newHeight = maxHeight;
+                if (newHeight < minHeight) newHeight = minHeight;
+
+                sidebar.style.height = newHeight + 'px';
+            });
+
+            window.addEventListener('touchend', () => {
+                isDragging = false;
+            });
+
+            // 마우스 드래그 지원 (PC 화면에서 모바일 크기로 테스트할 때 유용)
+            dragHandle.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                startY = e.clientY;
+                startHeight = sidebar.offsetHeight;
+                e.preventDefault();
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                const deltaY = startY - e.clientY;
+                let newHeight = startHeight + deltaY;
+                const maxHeight = window.innerHeight * 0.9;
+                const minHeight = window.innerHeight * 0.12;
+
+                if (newHeight > maxHeight) newHeight = maxHeight;
+                if (newHeight < minHeight) newHeight = minHeight;
+
+                sidebar.style.height = newHeight + 'px';
+            });
+
+            window.addEventListener('mouseup', () => {
+                isDragging = false;
+            });
+
+            // 기존 지도 및 데이터 로직
             const statusMsg = document.getElementById('status-msg');
 
             if (typeof kakao === 'undefined' || !kakao.maps) {
@@ -92,14 +174,13 @@
             let centerLat = 37.566535;
             let centerLng = 126.977969;
             
-            // 줌 레벨에 따른 반경 계산 함수
             function getRadiusByLevel(level) {
-                if (level <= 3) return 300;     // 매우 확대
-                if (level === 4) return 500;    // 기본
-                if (level === 5) return 1000;   // 1km
-                if (level === 6) return 2000;   // 2km
-                if (level === 7) return 4000;   // 4km
-                return 6000;                    // 광역 축소
+                if (level <= 3) return 300;     
+                if (level === 4) return 500;    
+                if (level === 5) return 1000;   
+                if (level === 6) return 2000;   
+                if (level === 7) return 4000;   
+                return 6000;                    
             }
 
             let currentLevel = 4;
@@ -191,7 +272,6 @@
                 if (!storeName) storeName = '';
 
                 const text = (indsName + ' ' + indsLargeName + ' ' + storeName).toLowerCase();
-
                 const excludeKeywords = [
                     '부동산', '중개', '미용', '헤어', '뷰티', '피부', '욕탕', '사우나', '찜질', 
                     '세탁', '크리닝', 'pc방', '컴퓨터', '당구장', '오락', '약국', '병원', '의원', 
@@ -481,8 +561,8 @@
 
                 const imageSrc = 'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_red.png';
                 const imageSize = new kakao.maps.Size(35, 35);
-                const imageOption = { offset: new kakao.maps.Point(13, 35) };
-                const markerImage = new kakao.maps.MarkerImage(imageSrc, imageSize, imageOption);
+                const imageOption = { offset: new kakalo = new kakao.maps.Point(13, 35) };
+                const markerImage = new kakao.maps.MarkerImage(imageSrc, imageSize, { offset: new kakao.maps.Point(13, 35) });
 
                 centerMarker = new kakao.maps.Marker({
                     position: latlng,
@@ -502,7 +582,6 @@
                 centerCircle.setMap(map);
             }
 
-            // [수정됨] 줌인/줌아웃 시 고정핀 위치(centerLat, centerLng)는 그대로 유지하고 반경과 목록만 갱신
             kakao.maps.event.addListener(map, 'zoom_changed', function() {
                 const newLevel = map.getLevel();
                 if (newLevel !== currentLevel) {
@@ -510,14 +589,12 @@
                     radius = getRadiusByLevel(currentLevel);
                     updateGuideText(radius);
                     
-                    // 기존에 지정된 고정핀 위치 기준 유지
                     const fixedLatLng = new kakao.maps.LatLng(centerLat, centerLng);
                     updateCenterMarker(fixedLatLng);
                     loadStores(centerLat, centerLng);
                 }
             });
 
-            // 지도 클릭 시에만 해당 위치로 고정핀 이동
             kakao.maps.event.addListener(map, 'click', function(mouseEvent) {
                 const latlng = mouseEvent.latLng;
                 centerLat = latlng.getLat();
