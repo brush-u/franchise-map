@@ -18,7 +18,6 @@
         .global-toggle-btn:hover, .wishlist-tab-btn:hover { background: rgba(255, 255, 255, 0.3); }
         .wishlist-tab-btn.active { background: white; color: #0066ff; font-weight: bold; border-color: white; }
 
-        /* 모바일 핸들바 영역 (탭 전환 안내 기능 겸용) */
         .mobile-handle-bar { display: none; width: 100%; height: 28px; background: #f8f9fa; align-items: center; justify-content: center; cursor: pointer; border-top: 1px solid #ddd; border-radius: 14px 14px 0 0; user-select: none; }
         .mobile-handle { width: 48px; height: 5px; background: #94a3b8; border-radius: 3px; }
 
@@ -216,15 +215,17 @@
             let centerLat = 37.566535;
             let centerLng = 126.977969;
             
+            // 줌 레벨별 반경을 세밀하고 여유있게 매핑 (지도를 넓히면 반경이 확실히 커지도록 개선)
             function getRadiusByLevel(level) {
-                if (level === 1) return 50;     
-                if (level === 2) return 100;    
-                if (level === 3) return 300;     
-                if (level === 4) return 500;    
-                if (level === 5) return 1000;   
-                if (level === 6) return 2000;   
-                if (level === 7) return 4000;   
-                return 6000;                    
+                if (level === 1) return 100;     // 100m
+                if (level === 2) return 250;     // 250m
+                if (level === 3) return 500;     // 500m
+                if (level === 4) return 1000;    // 1km
+                if (level === 5) return 2000;    // 2km
+                if (level === 6) return 3500;    // 3.5km
+                if (level === 7) return 5000;    // 5km
+                if (level === 8) return 8000;    // 8km
+                return 10000;                    // 최대 10km
             }
 
             let currentLevel = 4;
@@ -287,7 +288,6 @@
                 if (isWishlistMode) {
                     renderWishlist();
                 } else {
-                    // 현재 검색어 입력창의 값에 따라 필터 유지하며 갱신
                     filterStores();
                 }
             }
@@ -767,7 +767,8 @@
                 if (isWishlistMode) return; 
 
                 try {
-                    const response = await fetch(`/api/stores/radius?cx=${lng}&cy=${lat}&radius=${radius}`);
+                    // 넓은 반경(radius)을 서버로 보낼 때 데이터 누락 방지를 위해 numOfRows 파라미터를 넉넉히(예: 500개) 요청하도록 설정
+                    const response = await fetch(`/api/stores/radius?cx=${lng}&cy=${lat}&radius=${radius}&numOfRows=500`);
                     const data = await response.json();
 
                     let items = [];
