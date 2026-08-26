@@ -7,7 +7,7 @@
     <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=__KAKAO_API_KEY__"></script>
     <style>
         body { margin: 0; padding: 0; font-family: 'Malgun Gothic', sans-serif; display: flex; height: 100vh; overflow: hidden; }
-        #map { flex: 2; height: 100%; }
+        #map { flex: 2; height: 100%; position: relative; }
         #sidebar { flex: 1; height: 100%; background: #f8f9fa; border-left: 1px solid #ddd; display: flex; flex-direction: column; }
         
         .sidebar-header { padding: 15px 20px; background: #0066ff; color: white; font-size: 18px; font-weight: bold; display: flex; align-items: center; justify-content: space-between; }
@@ -25,11 +25,38 @@
         .search-input { flex: 1; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; outline: none; }
         .search-input:focus { border-color: #0066ff; }
         
-        /* 지도 서비스 선택 박스 (검색창 옆 배치) */
+        /* 지도 서비스 선택 박스 */
         .map-selector { padding: 8px 10px; font-size: 13px; border-radius: 6px; border: 1px solid #cbd5e1; background: white; color: #0066ff; font-weight: bold; cursor: pointer; outline: none; width: 110px; }
         
         .search-btn { padding: 8px 14px; background: #0066ff; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
         .search-btn:hover { background: #0052cc; }
+
+        /* 📍 현재 위치로 이동하기 버튼 스타일 */
+        .geolocation-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 5;
+            background: white;
+            border: 1px solid #cbd5e1;
+            padding: 8px 14px;
+            border-radius: 6px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+            font-weight: bold;
+            font-size: 13px;
+            color: #333;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            outline: none;
+            transition: 0.2s;
+        }
+        .geolocation-btn:hover {
+            background: #f1f5f9;
+            color: #0066ff;
+            border-color: #0066ff;
+        }
 
         .store-list { flex: 1; overflow-y: auto; padding: 15px; }
         
@@ -56,6 +83,8 @@
             body { flex-direction: column; height: 100vh; position: relative; }
             #map { width: 100%; height: 100%; flex: none; position: absolute; top: 0; left: 0; z-index: 1; }
             
+            .geolocation-btn { top: 15px; right: 15px; padding: 6px 10px; font-size: 12px; }
+
             #sidebar { 
                 position: absolute; 
                 bottom: 0; 
@@ -77,7 +106,12 @@
 </head>
 <body>
 
-    <div id="map"></div>
+    <div id="map">
+        <!-- 📍 현재 위치로 이동 및 재검색 버튼 -->
+        <button id="current-location-btn" class="geolocation-btn">
+            📍 내 위치로 이동
+        </button>
+    </div>
 
     <div id="sidebar">
         <!-- 모바일 터치 드래그 핸들 바 -->
@@ -343,7 +377,6 @@
             }
 
             function pinStoreOnMap(store, marker, infowindow) {
-                // 이미 열려있는 풍선말을 다시 누르면 닫기 (토글 기능)
                 if (pinnedInfoWindow === infowindow) {
                     infowindow.close();
                     pinnedInfoWindow = null;
@@ -596,9 +629,9 @@
                 if (centerMarker) centerMarker.setMap(null);
                 if (centerCircle) centerCircle.setMap(null);
 
-                const imageSrc = 'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_red.png';
-                const imageSize = new kakao.maps.Size(35, 35);
-                const imageOption = { offset: new kakao.maps.Point(13, 35) };
+                const imageSrc = 'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/markerStar.png'; 
+                const imageSize = new kakao.maps.Size(32, 37);
+                const imageOption = { offset: new kakao.maps.Point(16, 37) };
                 const markerImage = new kakao.maps.MarkerImage(imageSrc, imageSize, imageOption);
 
                 centerMarker = new kakao.maps.Marker({
@@ -611,13 +644,44 @@
                     center: latlng,
                     radius: radius,
                     strokeWeight: 3,
-                    strokeColor: '#ff3333',
+                    strokeColor: '#0066ff',
                     strokeOpacity: 0.9,
-                    fillColor: '#ff3333',
-                    fillOpacity: 0.15
+                    fillColor: '#0066ff',
+                    fillOpacity: 0.12
                 });
                 centerCircle.setMap(map);
             }
+
+            // 📍 [내 위치로 이동] 버튼 클릭 시 현재 위치 재탐색 및 검색 기능
+            document.getElementById('current-location-btn').onclick = function() {
+                if (!navigator.geolocation) {
+                    alert('이 브라우저는 위치 정보를 지원하지 않습니다.');
+                    return;
+                }
+
+                document.getElementById('store-list-container').innerHTML = '<p style="text-align: center; color: #888; margin-top: 50px;">현재 위치를 가져오는 중...</p>';
+
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        centerLat = position.coords.latitude;
+                        centerLng = position.coords.longitude;
+
+                        const currentLatLng = new kakao.maps.LatLng(centerLat, centerLng);
+                        map.setCenter(currentLatLng);
+                        updateGuideText(radius);
+                        updateCenterMarker(currentLatLng);
+                        loadStores(centerLat, centerLng);
+                    },
+                    function(error) {
+                        alert('현재 위치를 가져오지 못했습니다. 위치 권한을 확인해주세요.');
+                        console.warn(error);
+                    },
+                    {
+                        timeout: 10000,
+                        maximumAge: 0
+                    }
+                );
+            };
 
             kakao.maps.event.addListener(map, 'zoom_changed', function() {
                 const newLevel = map.getLevel();
@@ -633,7 +697,6 @@
             });
 
             kakao.maps.event.addListener(map, 'click', function(mouseEvent) {
-                // 빈 지도를 클릭했을 때 열려있던 풍선말 닫기 및 선택 해제
                 if (pinnedInfoWindow) {
                     pinnedInfoWindow.close();
                     pinnedInfoWindow = null;
