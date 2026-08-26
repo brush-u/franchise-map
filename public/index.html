@@ -116,7 +116,7 @@
                 bottom: 0; 
                 left: 0; 
                 width: 100%; 
-                height: 32vh; /* 초기 기본 높이 */
+                height: 32vh; 
                 z-index: 10; 
                 border-left: none; 
                 border-top: 1px solid #ddd;
@@ -125,15 +125,8 @@
                 transition: height 0.3s cubic-bezier(0.1, 0.9, 0.2, 1);
             }
 
-            /* 목록을 크게 키웠을 때 */
-            #sidebar.list-expanded {
-                height: 88vh;
-            }
-
-            /* 지도를 크게 보기 위해 목록을 최소화했을 때 */
-            #sidebar.map-expanded {
-                height: 12vh;
-            }
+            #sidebar.list-expanded { height: 88vh; }
+            #sidebar.map-expanded { height: 12vh; }
 
             .mobile-handle-bar { display: flex; }
         }
@@ -185,11 +178,10 @@
             const dragHandle = document.getElementById('drag-handle');
             const sidebarHeader = document.getElementById('sidebar-header-toggle');
 
-            // 모바일 탭 전환 로직 (지도를 누르면 지도가 크게, 목록 핸들/헤더를 누르면 목록이 크게)
             function expandList() {
                 if (window.innerWidth <= 768) {
                     if (sidebar.classList.contains('list-expanded')) {
-                        sidebar.classList.remove('list-expanded'); // 기본 높이로 복귀
+                        sidebar.classList.remove('list-expanded');
                     } else {
                         sidebar.classList.remove('map-expanded');
                         sidebar.classList.add('list-expanded');
@@ -204,13 +196,10 @@
                 }
             }
 
-            // 핸들바나 상단 헤더를 누르면 목록 확장/축소 토글
             dragHandle.onclick = expandList;
             sidebarHeader.onclick = expandList;
 
-            // 지도를 터치/클릭하면 지도를 크게 보기 위해 목록을 접음
             mapContainer.onclick = function(e) {
-                // 내 위치 버튼 클릭은 예외 처리
                 if (e.target.id === 'current-location-btn' || e.target.closest('#current-location-btn')) return;
                 expandMap();
             };
@@ -323,7 +312,7 @@
 
             const wishlistTabBtn = document.getElementById('wishlist-tab-btn');
             wishlistTabBtn.onclick = function(e) {
-                e.stopPropagation(); // 헤더 클릭 이벤트 전파 방지
+                e.stopPropagation();
                 isWishlistMode = !isWishlistMode;
                 updateWishlistButtonCount();
 
@@ -345,9 +334,9 @@
                 }
 
                 if (addressName) {
-                    guideEl.innerHTML = `📍 <strong>중심 위치:</strong> ${addressName}<br>반경 <strong>${rangeStr}</strong> 내 식당`;
+                    guideEl.innerHTML = `📍 <strong>중심 위치:</strong> ${addressName}<br>📍 반경 <strong>${rangeStr}</strong> 내 음식점`;
                 } else {
-                    guideEl.innerHTML = `💡 현재 위치 기준 ${rangeStr} 내 식당을 불러옵니다.`;
+                    guideEl.innerHTML = `📍 현재 위치 기준 반경 <strong>${rangeStr}</strong> 내 음식점을 불러옵니다.`;
                 }
             }
 
@@ -662,17 +651,6 @@
                 if (totalCount === 0) {
                     listContainer.innerHTML = '<p style="text-align: center; color: #888; margin-top: 30px;">반경 내 음식점이 없습니다.</p>';
                 }
-
-                if (currentLatLng) {
-                    searchDetailAddrFromCoords(currentLatLng, function(result, status) {
-                        if (status === kakao.maps.services.Status.OK) {
-                            let detailAddr = result[0].road_address ? result[0].road_address.address_name : '';
-                            let jibunAddr = result[0].address ? result[0].address.address_name : '';
-                            let fullAddress = detailAddr || jibunAddr || '주소 정보 없음';
-                            updateGuideText(radius, fullAddress);
-                        }
-                    });
-                }
             }
 
             window.toggleWishFromWindow = function(storeKey) {
@@ -844,6 +822,7 @@
             };
 
             function updateCenterMarker(latlng) {
+                // 1. 마커와 원을 즉시 표시하여 속도 개선
                 if (centerMarker) centerMarker.setMap(null);
                 if (centerCircle) centerCircle.setMap(null);
                 if (centerInfoWindow) centerInfoWindow.close();
@@ -870,6 +849,10 @@
                 });
                 centerCircle.setMap(map);
 
+                // 초기 안내 텍스트 먼저 갱신
+                updateGuideText(radius, null);
+
+                // 2. 주소 변환(Geocoding)은 비동기로 처리하여 UI 반응 속도를 빠르게 유지
                 searchDetailAddrFromCoords(latlng, function(result, status) {
                     if (status === kakao.maps.services.Status.OK) {
                         let detailAddr = result[0].road_address ? result[0].road_address.address_name : '';
@@ -886,8 +869,6 @@
                         kakao.maps.event.addListener(centerMarker, 'click', function() {
                             centerInfoWindow.open(map, centerMarker);
                         });
-                    } else {
-                        updateGuideText(radius, '위치 주소 확인 불가');
                     }
                 });
             }
@@ -937,7 +918,7 @@
             });
 
             kakao.maps.event.addListener(map, 'click', function(mouseEvent) {
-                expandMap(); // 지도 클릭 시 자동으로 지도 넓게 보기
+                expandMap();
 
                 if (pinnedInfoWindow) {
                     pinnedInfoWindow.close();
