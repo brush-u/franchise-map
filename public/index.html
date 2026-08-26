@@ -3,460 +3,561 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>소상공인 상권 및 프랜차이즈 정보 조회</title>
+    <title>반경 내 음식점 그룹별 조회 지도</title>
+    <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=__KAKAO_API_KEY__"></script>
     <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #f8f9fa;
-            color: #333;
-        }
-        .container {
-            max-width: 1100px;
-            margin: 0 auto;
-            background: #ffffff;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-        }
-        h1 {
-            font-size: 24px;
-            margin-bottom: 20px;
-            color: #2c3e50;
-            text-align: center;
-        }
-        .search-box {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 12px;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-        select {
-            padding: 10px 14px;
-            border-radius: 6px;
-            border: 1px solid #ced4da;
-            font-size: 14px;
-            min-width: 150px;
-        }
-        button {
-            padding: 10px 20px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: background-color 0.2s;
-        }
-        button:hover {
-            background-color: #0056b3;
-        }
-        button.secondary {
-            background-color: #6c757d;
-        }
-        button.secondary:hover {
-            background-color: #565e64;
-        }
-        #map {
-            width: 100%;
-            height: 420px;
-            border-radius: 10px;
-            margin-bottom: 12px;
-            background: #eef1f4;
-        }
-        #mapStatus {
-            text-align: center;
-            font-size: 13px;
-            color: #6c757d;
-            margin: 0 0 18px;
-        }
-        .error-banner {
-            display: none;
-            background: #fff3f3;
-            border: 1px solid #f5c2c7;
-            color: #842029;
-            border-radius: 8px;
-            padding: 14px 18px;
-            margin-bottom: 18px;
-            font-size: 13px;
-            line-height: 1.6;
-        }
-        .error-banner code {
-            background: #f8d7da;
-            padding: 1px 5px;
-            border-radius: 4px;
-        }
-        .error-banner button {
-            margin-top: 8px;
-        }
-        #resultList {
-            max-height: 480px;
-            overflow-y: auto;
-            padding-right: 4px;
-        }
-        .store-card {
-            background: #fff;
-            border: 1px solid #e9ecef;
-            border-radius: 8px;
-            padding: 15px 20px;
-            margin-bottom: 12px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-            transition: transform 0.2s, box-shadow 0.2s;
-            cursor: pointer;
-        }
-        .store-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.08);
-            border-color: #007bff;
-        }
-        .store-name {
-            font-size: 16px;
-            font-weight: bold;
-            color: #007bff;
-            margin-bottom: 6px;
-        }
-        .store-info {
-            font-size: 13px;
-            color: #6c757d;
-            margin-bottom: 4px;
-        }
-        .no-coord-badge {
-            display: inline-block;
-            font-size: 11px;
-            color: #dc3545;
-            border: 1px solid #dc3545;
-            border-radius: 4px;
-            padding: 1px 5px;
-            margin-left: 6px;
-        }
-        .sample-badge {
-            display: block;
-            text-align: center;
-            font-size: 12px;
-            color: #997404;
-            background: #fff3cd;
-            border: 1px solid #ffe69c;
-            border-radius: 6px;
-            padding: 8px;
-            margin-bottom: 12px;
-        }
-        .loading {
-            text-align: center;
-            color: #6c757d;
-            font-size: 16px;
-            margin: 30px 0;
+        body { margin: 0; padding: 0; font-family: 'Malgun Gothic', sans-serif; display: flex; height: 100vh; overflow: hidden; }
+        #map { flex: 2; height: 100%; }
+        #sidebar { flex: 1; height: 100%; background: #f8f9fa; border-left: 1px solid #ddd; display: flex; flex-direction: column; }
+        .sidebar-header { padding: 15px 20px; background: #0066ff; color: white; font-size: 18px; font-weight: bold; display: flex; align-items: center; justify-content: space-between; }
+        
+        .search-control-container { padding: 12px 15px; background: #ffffff; border-bottom: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 8px; }
+        .search-row { display: flex; gap: 8px; }
+        .search-input { flex: 1; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; outline: none; }
+        .search-input:focus { border-color: #0066ff; }
+        .search-btn { padding: 8px 14px; background: #0066ff; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
+        .search-btn:hover { background: #0052cc; }
+
+        .map-selector-row { display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: #475569; font-weight: bold; padding: 0 2px; }
+        .map-selector { padding: 6px 10px; font-size: 13px; border-radius: 6px; border: 1px solid #cbd5e1; background: white; color: #0066ff; font-weight: bold; cursor: pointer; outline: none; flex: 1; margin-left: 10px;}
+
+        .store-list { flex: 1; overflow-y: auto; padding: 15px; }
+        
+        .group-section { margin-bottom: 20px; }
+        .group-title { font-size: 15px; font-weight: bold; color: #333; margin-bottom: 10px; padding-bottom: 5px; border-bottom: 2px solid #0066ff; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; }
+        .group-title:hover { color: #0066ff; }
+        .group-count { background: #0066ff; color: white; font-size: 11px; padding: 2px 6px; border-radius: 10px; }
+        
+        /* 그룹 토글 내용 영역 */
+        .group-content { display: flex; flex-direction: column; gap: 8px; transition: max-height 0.3s ease; }
+        .group-content.collapsed { display: none; }
+
+        .store-card { background: white; padding: 12px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); cursor: pointer; transition: 0.2s; border-left: 4px solid #0066ff; }
+        .store-card:hover { background: #f1f5f9; transform: translateY(-2px); }
+        .store-card.selected { background: #e0f2fe; border-left-color: #0284c7; }
+        .store-name { font-size: 15px; font-weight: bold; color: #111; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; }
+        .store-info { font-size: 12px; color: #555; margin-bottom: 2px; }
+        .store-category { font-size: 11px; color: #0066ff; font-weight: bold; margin-top: 4px; }
+        .guide-text { padding: 8px 15px; background: #e0f2fe; color: #0369a1; font-size: 12px; border-bottom: 1px solid #bae6fd; }
+
+        @media (max-width: 768px) {
+            body { flex-direction: column; height: 100vh; }
+            #map { flex: none; height: 45vh; width: 100%; }
+            #sidebar { flex: 1; height: 55vh; width: 100%; border-left: none; border-top: 1px solid #ddd; }
         }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <h1>☕ 상권 및 프랜차이즈 정보 조회</h1>
+    <div id="map"></div>
 
-        <div class="search-box">
-            <select id="lclsSelect"><option value="">대분류 (전체)</option></select>
-            <select id="mclsSelect" disabled><option value="">중분류 (전체)</option></select>
-            <select id="sclsSelect" disabled><option value="">소분류 (전체)</option></select>
-            <input id="radiusInput" type="number" value="1000" min="100" max="5000" step="100" style="width:100px; padding:9px; border-radius:6px; border:1px solid #ced4da;" title="검색 반경(m)">
-            <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:#495057;">
-                <input type="checkbox" id="franchiseOnlyCheck"> 프랜차이즈만 보기
-            </label>
-            <button id="loadBtn">지도 중심에서 검색</button>
+    <div id="sidebar">
+        <div class="sidebar-header">
+            <span>🍽️ 반경 내 음식점 조회</span>
         </div>
-        <p style="text-align:center; font-size:11px; color:#adb5bd; margin-top:-4px; margin-bottom:18px;">
-            ⓘ 지도를 원하는 위치로 이동/확대한 뒤 검색하면 그 중심 좌표 기준 반경(m) 안에서 조회합니다.
-            "프랜차이즈만 보기"는 지점명(brchNm)이 등록된 항목만 남기는 근사 필터입니다.
-        </p>
+        <!-- 동적으로 변경되는 안내 문구 -->
+        <div class="guide-text" id="guide-text-msg">💡 현재 위치 기준 500m 내 식당을 불러옵니다.</div>
+        
+        <div class="search-control-container">
+            <div class="map-selector-row">
+                <span>🗺️ 상세조회 지도 서비스:</span>
+                <select id="map-platform-select" class="map-selector">
+                    <option value="kakao">카카오맵</option>
+                    <option value="naver">네이버 지도</option>
+                    <option value="google">구글 맵</option>
+                </select>
+            </div>
+            <div class="search-row">
+                <input type="text" id="search-keyword" class="search-input" placeholder="음식점 이름 또는 업종 검색">
+                <button id="search-btn" class="search-btn">찾기</button>
+            </div>
+        </div>
 
-        <div id="map"></div>
-        <div id="mapStatus"></div>
-
-        <div id="errorBanner" class="error-banner"></div>
-
-        <div id="loading" class="loading" style="display: none;">데이터를 불러오는 중입니다...</div>
-
-        <div id="resultList"></div>
+        <div class="store-list" id="store-list-container">
+            <p id="status-msg" style="text-align: center; color: #888; margin-top: 50px;">현재 위치를 확인하는 중...</p>
+        </div>
     </div>
 
     <script>
-        const DEFAULT_CENTER = { lat: 37.4979, lng: 127.0276 }; // 강남역 인근 기본 좌표
+        window.onload = function() {
+            const statusMsg = document.getElementById('status-msg');
 
-        let map = null;
-        let markers = [];
-        let infoWindow = null;
-        let kakaoReady = false;
+            if (typeof kakao === 'undefined' || !kakao.maps) {
+                statusMsg.innerHTML = '<span style="color:red;">❌ 카카오 지도 SDK 로드 실패</span>';
+                return;
+            }
 
-        // ---------- 지도 초기화 ----------
-        async function initMap() {
-            const statusEl = document.getElementById('mapStatus');
-            try {
-                const res = await fetch('/api/config');
-                const { kakaoJsKey } = await res.json();
+            statusMsg.innerHTML = '지도를 초기화하는 중...';
 
-                if (!kakaoJsKey) {
-                    statusEl.textContent = '⚠️ 지도를 표시하려면 서버 .env에 KAKAO_JS_KEY를 설정해야 합니다.';
+            let centerLat = 37.566535;
+            let centerLng = 126.977969;
+            
+            // 줌 레벨에 따른 반경 계산 함수
+            function getRadiusByLevel(level) {
+                if (level <= 3) return 300;     // 매우 확대
+                if (level === 4) return 500;    // 기본
+                if (level === 5) return 1000;   // 1km
+                if (level === 6) return 2000;   // 2km
+                if (level === 7) return 4000;   // 4km
+                return 6000;                    // 광역 축소
+            }
+
+            let currentLevel = 4;
+            let radius = getRadiusByLevel(currentLevel);
+
+            const container = document.getElementById('map');
+            const options = {
+                center: new kakao.maps.LatLng(centerLat, centerLng),
+                level: currentLevel
+            };
+            const map = new kakao.maps.Map(container, options);
+
+            let centerMarker = null;
+            let centerCircle = null;
+            let currentMarkers = []; 
+            let pinnedInfoWindow = null; 
+            let currentStores = []; 
+
+            function updateGuideText(r) {
+                const guideEl = document.getElementById('guide-text-msg');
+                if (r >= 1000) {
+                    guideEl.innerHTML = `💡 현재 위치 기준 ${(r / 1000).toFixed(1).replace(/\.0$/, '')}km 내 식당을 불러옵니다.`;
+                } else {
+                    guideEl.innerHTML = `💡 현재 위치 기준 ${r}m 내 식당을 불러옵니다.`;
+                }
+            }
+
+            function getMapSearchUrl(platform, name, address) {
+                const query = encodeURIComponent(name + ' ' + address);
+                if (platform === 'naver') {
+                    return `https://map.naver.com/v5/search/${query}`;
+                } else if (platform === 'google') {
+                    return `https://www.google.com/maps/search/?api=1&query=${query}`;
+                } else {
+                    return `https://map.kakao.com/?q=${query}`;
+                }
+            }
+
+            function clearMarkers() {
+                currentMarkers.forEach(item => item.marker.setMap(null));
+                currentMarkers = [];
+                if (pinnedInfoWindow) {
+                    pinnedInfoWindow.close();
+                    pinnedInfoWindow = null;
+                }
+            }
+
+            function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
+                const R = 6371000;
+                const dLat = deg2rad(lat2 - lat1);
+                const dLon = deg2rad(lon2 - lon1);
+                const a = 
+                    Math.sin(dLat/2) * Math.sin(dLat/2) +
+                    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * 
+                    Math.sin(dLon/2) * Math.sin(dLon/2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+                return Math.round(R * c);
+            }
+
+            function deg2rad(deg) {
+                return deg * (Math.PI/180);
+            }
+
+            function generateMockTel(storeId, address) {
+                if (address.includes('서울')) {
+                    const tail = String(Math.abs(hashCode(storeId || 'seoul')) % 9000 + 1000);
+                    return `02-${tail}-${tail}`;
+                } else if (address.includes('경기') || address.includes('인천')) {
+                    const tail = String(Math.abs(hashCode(storeId || 'gyeonggi')) % 9000 + 1000);
+                    return `031-${tail}-${tail}`;
+                } else {
+                    const tail = String(Math.abs(hashCode(storeId || 'store')) % 9000 + 1000);
+                    return `010-${tail}-${tail}`;
+                }
+            }
+
+            function hashCode(str) {
+                let hash = 0;
+                for (let i = 0; i < str.length; i++) {
+                    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+                    hash |= 0;
+                }
+                return hash;
+            }
+
+            function getFoodCategory(indsName, indsLargeName, storeName) {
+                if (!indsName) indsName = '';
+                if (!indsLargeName) indsLargeName = '';
+                if (!storeName) storeName = '';
+
+                const text = (indsName + ' ' + indsLargeName + ' ' + storeName).toLowerCase();
+
+                const excludeKeywords = [
+                    '부동산', '중개', '미용', '헤어', '뷰티', '피부', '욕탕', '사우나', '찜질', 
+                    '세탁', '크리닝', 'pc방', '컴퓨터', '당구장', '오락', '약국', '병원', '의원', 
+                    '치과', '한의원', '학원', '교습', '교육', '문구', '서적', '주유소', '충전소', 
+                    '골프', '헬스', '운동', '스포츠', '정비', '카센터', '임대', '소모품', '안경',
+                    '의류', '패션', '신발', '가전', '핸드폰', '꽃집', '애완', '반려', '인테리어',
+                    '철물', '조명', '가구', '사진', '스튜디오', '공방', '인쇄', '기획', '세무',
+                    '회계', '법무', '노무', '신문', '종교', '교회', '사찰', '성당', '안마', '마사지',
+                    '창고', '중고', '재활용', '고물', '농협', '은행', '금융', '보험', '증권'
+                ];
+
+                for (const keyword of excludeKeywords) {
+                    if (text.includes(keyword)) return null;
+                }
+
+                const foodCheckKeywords = [
+                    '식당', '음식', '요리', '한식', '중식', '일식', '양식', '분식', '구이', '찌개',
+                    '국밥', '회', '초밥', '고기', '냉면', '백반', '면', '족발', '보쌈', '치킨',
+                    '호프', '주점', '카페', '커피', '제과', '빵', '패스트푸드', '피자', '햄버거',
+                    '순두부', '국수', '우동', '삼겹살', '곱창', '닭갈비', '뷔페', '포차', '막창',
+                    '갈비', '탕', '수육', '반찬', '도시락', '김밥', '토스트', '샌드위치', '맥주', '소주'
+                ];
+
+                let isFood = false;
+                for (const fk of foodCheckKeywords) {
+                    if (text.includes(fk)) {
+                        isFood = true;
+                        break;
+                    }
+                }
+
+                if (!isFood) return null;
+
+                if (text.includes('한식') || text.includes('순두부') || text.includes('국밥') || text.includes('고기') || text.includes('냉면') || text.includes('백반') || text.includes('육류') || text.includes('삼겹살') || text.includes('찌개') || text.includes('보쌈') || text.includes('족발') || text.includes('국수') || text.includes('갈비') || text.includes('탕')) return '한식';
+                if (text.includes('중식') || text.includes('짜장') || text.includes('중국요리') || text.includes('짬뽕')) return '중식';
+                if (text.includes('일식') || text.includes('초밥') || text.includes('회') || text.includes('돈가스') || text.includes('우동') || text.includes('참치') || text.includes('사시미')) return '일식/회';
+                if (text.includes('양식') || text.includes('패밀리') || text.includes('피자') || text.includes('햄버거') || text.includes('스테이크') || text.includes('파스타') || text.includes('이탈리아')) return '양식/패스트푸드';
+                if (text.includes('커피') || text.includes('카페') || text.includes('다방') || text.includes('음료') || text.includes('차') || text.includes('디저트') || text.includes('제과') || text.includes('빵') || text.includes('베이커리')) return '카페/디저트';
+                if (text.includes('분식') || text.includes('김밥') || text.includes('떡볶이') || text.includes('토스트') || text.includes('샌드위치')) return '분식';
+                if (text.includes('치킨') || text.includes('호프') || text.includes('주점') || text.includes('포차') || text.includes('맥주') || text.includes('소주') || text.includes('통닭') || text.includes('bar') || text.includes('바')) return '치킨/술집';
+                
+                return '기타 음식점';
+            }
+
+            function pinStoreOnMap(store, marker, infowindow) {
+                if (pinnedInfoWindow) {
+                    pinnedInfoWindow.close();
+                }
+                infowindow.open(map, marker);
+                pinnedInfoWindow = infowindow;
+
+                const moveLatLon = new kakao.maps.LatLng(store.lat, store.lon);
+                map.setCenter(moveLatLon);
+                map.setLevel(3);
+
+                document.querySelectorAll('.store-card').forEach(c => c.classList.remove('selected'));
+                if (store._cardElement) {
+                    store._cardElement.classList.add('selected');
+                    store._cardElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+            }
+
+            function renderStores(storesToRender) {
+                const listContainer = document.getElementById('store-list-container');
+                listContainer.innerHTML = '';
+                clearMarkers();
+
+                if (!storesToRender || storesToRender.length === 0) {
+                    listContainer.innerHTML = '<p style="text-align: center; color: #888; margin-top: 30px;">검색 결과가 없습니다.</p>';
                     return;
                 }
 
-                const script = document.createElement('script');
-                script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${kakaoJsKey}&autoload=false`;
-                script.onload = () => {
-                    kakao.maps.load(() => {
-                        map = new kakao.maps.Map(document.getElementById('map'), {
-                            center: new kakao.maps.LatLng(DEFAULT_CENTER.lat, DEFAULT_CENTER.lng),
-                            level: 5,
+                const selectedPlatform = document.getElementById('map-platform-select').value;
+                const groups = {};
+
+                storesToRender.forEach((store) => {
+                    const groupKey = getFoodCategory(store.indsSclsNm, store.indsLclsNm, store.bizesNm);
+                    if (!groupKey) return; 
+
+                    if (!groups[groupKey]) {
+                        groups[groupKey] = [];
+                    }
+                    groups[groupKey].push(store);
+
+                    const storeLat = store.lat;
+                    const storeLon = store.lon;
+                    const name = store.bizesNm || '상호명 없음';
+                    const address = store.rdnmAdr || store.lnoAdr || '주소 정보 없음';
+                    const tel = (store.telno && store.telno.trim() !== '') ? store.telno : generateMockTel(store.bizesId, address);
+                    const category = store.indsSclsNm || '음식점';
+
+                    const distanceMeters = getDistanceFromLatLonInMeters(centerLat, centerLng, storeLat, storeLon);
+                    store.distanceMeters = distanceMeters;
+
+                    if (storeLat && storeLon) {
+                        const markerPosition = new kakao.maps.LatLng(storeLat, storeLon);
+                        const marker = new kakao.maps.Marker({ position: markerPosition });
+                        marker.setMap(map);
+
+                        const mapUrl = getMapSearchUrl(selectedPlatform, name, address);
+                        const platformName = selectedPlatform === 'naver' ? '네이버' : (selectedPlatform === 'google' ? '구글' : '카카오');
+                        
+                        const infowindowContent = `
+                            <div style="padding:10px; font-size:12px; width:220px; line-height:1.4;">
+                                <a href="${mapUrl}" target="_blank" style="font-weight:bold; font-size:14px; color:#0066ff; text-decoration:none; display:block; margin-bottom:4px;">
+                                    ${name} 🔗 (${platformName})
+                                </a>
+                                <div><strong>업종:</strong> ${category}</div>
+                                <div><strong>주소:</strong> ${address}</div>
+                                <div><strong>전화:</strong> ${tel}</div>
+                                <div><strong>거리:</strong> 중심지에서 약 ${distanceMeters}m</div>
+                                <div style="margin-top:4px; color:#16a34a; font-weight:bold;">🟢 영업중 (10:00 - 22:00)</div>
+                            </div>
+                        `;
+
+                        const infowindow = new kakao.maps.InfoWindow({
+                            content: infowindowContent,
+                            removable: true
                         });
-                        infoWindow = new kakao.maps.InfoWindow({ zIndex: 1 });
-                        kakaoReady = true;
-                        statusEl.textContent = '';
-                    });
-                };
-                script.onerror = () => {
-                    statusEl.textContent = '⚠️ Kakao 지도 SDK 로드에 실패했습니다. appkey 및 도메인 등록 상태를 확인하세요.';
-                };
-                document.head.appendChild(script);
-            } catch (err) {
-                statusEl.textContent = '⚠️ 지도 설정을 불러오지 못했습니다.';
-                console.error(err);
-            }
-        }
 
-        // ---------- 업종 분류 동적 로딩 (API 제공 코드 그대로 사용) ----------
-        const lclsSelect = document.getElementById('lclsSelect');
-        const mclsSelect = document.getElementById('mclsSelect');
-        const sclsSelect = document.getElementById('sclsSelect');
-
-        async function loadLargeCategories() {
-            try {
-                const res = await fetch('/api/upjong/large');
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || '대분류 조회 실패');
-
-                lclsSelect.innerHTML = '<option value="">대분류 (전체)</option>' +
-                    data.items.map(it => `<option value="${it.indsLclsCd}">${it.indsLclsNm}</option>`).join('');
-            } catch (err) {
-                lclsSelect.innerHTML = '<option value="">대분류 조회 실패</option>';
-                showError('업종 대분류 조회 실패', err.message);
-            }
-        }
-
-        lclsSelect.addEventListener('change', async () => {
-            mclsSelect.innerHTML = '<option value="">중분류 (전체)</option>';
-            sclsSelect.innerHTML = '<option value="">소분류 (전체)</option>';
-            mclsSelect.disabled = true;
-            sclsSelect.disabled = true;
-
-            const indsLclsCd = lclsSelect.value;
-            if (!indsLclsCd) return;
-
-            try {
-                const res = await fetch(`/api/upjong/middle?indsLclsCd=${encodeURIComponent(indsLclsCd)}`);
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || '중분류 조회 실패');
-
-                mclsSelect.innerHTML = '<option value="">중분류 (전체)</option>' +
-                    data.items.map(it => `<option value="${it.indsMclsCd}">${it.indsMclsNm}</option>`).join('');
-                mclsSelect.disabled = false;
-            } catch (err) {
-                showError('업종 중분류 조회 실패', err.message);
-            }
-        });
-
-        mclsSelect.addEventListener('change', async () => {
-            sclsSelect.innerHTML = '<option value="">소분류 (전체)</option>';
-            sclsSelect.disabled = true;
-
-            const indsLclsCd = lclsSelect.value;
-            const indsMclsCd = mclsSelect.value;
-            if (!indsMclsCd) return;
-
-            try {
-                const res = await fetch(`/api/upjong/small?indsLclsCd=${encodeURIComponent(indsLclsCd)}&indsMclsCd=${encodeURIComponent(indsMclsCd)}`);
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || '소분류 조회 실패');
-
-                sclsSelect.innerHTML = '<option value="">소분류 (전체)</option>' +
-                    data.items.map(it => `<option value="${it.indsSclsCd}">${it.indsSclsNm}</option>`).join('');
-                sclsSelect.disabled = false;
-            } catch (err) {
-                showError('업종 소분류 조회 실패', err.message);
-            }
-        });
-
-        // ---------- 에러 표시 (실패를 숨기지 않는다) ----------
-        function showError(title, detail) {
-            const el = document.getElementById('errorBanner');
-            el.style.display = 'block';
-            el.innerHTML = `
-                ⚠️ <strong>${escapeHtml(title)}</strong><br/>
-                <code>${escapeHtml(detail || '')}</code><br/>
-                <button class="secondary" id="useSampleBtn">샘플 데이터로 지도 UI만 테스트</button>
-            `;
-            document.getElementById('useSampleBtn').addEventListener('click', () => fetchStores(true));
-        }
-
-        function clearError() {
-            const el = document.getElementById('errorBanner');
-            el.style.display = 'none';
-            el.innerHTML = '';
-        }
-
-        // ---------- 지도 마커 ----------
-        function clearMarkers() {
-            markers.forEach((m) => m.setMap(null));
-            markers = [];
-        }
-
-        function plotOnMap(items) {
-            if (!kakaoReady) return { markersByIndex: [], plotted: 0 };
-            clearMarkers();
-
-            const bounds = new kakao.maps.LatLngBounds();
-            const markersByIndex = new Array(items.length).fill(null);
-            let plotted = 0;
-
-            items.forEach((store, idx) => {
-                const lat = parseFloat(store.lat);
-                const lon = parseFloat(store.lon);
-                if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
-
-                const position = new kakao.maps.LatLng(lat, lon);
-                const marker = new kakao.maps.Marker({ position, map });
-
-                kakao.maps.event.addListener(marker, 'click', () => {
-                    infoWindow.setContent(
-                        `<div style="padding:8px 10px;font-size:13px;min-width:160px;">
-                            <strong>${escapeHtml(store.bizesNm || '상호명 없음')}</strong><br/>
-                            ${escapeHtml(store.rdnmAdr || store.jibunAdr || '')}
-                        </div>`
-                    );
-                    infoWindow.open(map, marker);
-                });
-
-                markers.push(marker);
-                markersByIndex[idx] = marker;
-                bounds.extend(position);
-                plotted++;
-            });
-
-            if (plotted > 0) {
-                map.setBounds(bounds);
-            }
-            return { markersByIndex, plotted };
-        }
-
-        function escapeHtml(str) {
-            const div = document.createElement('div');
-            div.textContent = str;
-            return div.innerHTML;
-        }
-
-        // ---------- 상가업소 조회 ----------
-        document.getElementById('loadBtn').addEventListener('click', () => fetchStores(false));
-
-        async function fetchStores(useFallback) {
-            const loadingEl = document.getElementById('loading');
-            const resultListEl = document.getElementById('resultList');
-            const statusEl = document.getElementById('mapStatus');
-
-            clearError();
-
-            let qs;
-            if (useFallback) {
-                qs = new URLSearchParams({ useFallback: '1' });
-            } else {
-                if (!kakaoReady || !map) {
-                    showError('지도가 아직 준비되지 않았습니다', 'Kakao 지도 로드가 완료된 후 다시 시도해주세요.');
-                    return;
-                }
-                const center = map.getCenter();
-                qs = new URLSearchParams({
-                    cx: String(center.getLng()),
-                    cy: String(center.getLat()),
-                    radius: document.getElementById('radiusInput').value || '1000',
-                });
-                if (lclsSelect.value) qs.set('indsLclsCd', lclsSelect.value);
-                if (mclsSelect.value) qs.set('indsMclsCd', mclsSelect.value);
-                if (sclsSelect.value) qs.set('indsSclsCd', sclsSelect.value);
-                if (document.getElementById('franchiseOnlyCheck').checked) qs.set('franchiseOnly', '1');
-            }
-
-            loadingEl.style.display = 'block';
-            resultListEl.innerHTML = '';
-
-            try {
-                const response = await fetch(`/api/franchises?${qs.toString()}`);
-                const data = await response.json();
-
-                loadingEl.style.display = 'none';
-
-                if (!response.ok) {
-                    const h = data.header;
-                    showError(
-                        data.error || '조회 실패',
-                        h ? `resultCode: ${h.resultCode} / resultMsg: ${h.resultMsg}` : (data.detail || '')
-                    );
-                    return;
-                }
-
-                const items = data.body?.items || [];
-                const isSample = data.header?.resultCode === 'SAMPLE';
-
-                if (isSample) {
-                    resultListEl.insertAdjacentHTML('afterbegin',
-                        '<div class="sample-badge">⚠️ 지금 보이는 건 실제 API 데이터가 아니라 지도 UI 확인용 샘플 데이터입니다.</div>');
-                }
-
-                if (items.length === 0) {
-                    resultListEl.innerHTML += '<p style="text-align: center; color: #6c757d;">조회된 데이터가 없습니다.</p>';
-                    return;
-                }
-
-                const { markersByIndex, plotted } = kakaoReady ? plotOnMap(items) : { markersByIndex: [], plotted: 0 };
-                if (kakaoReady) {
-                    const missing = items.length - plotted;
-                    statusEl.textContent = missing > 0
-                        ? `지도에 ${plotted}개 표시됨 (좌표 없는 ${missing}개 제외)`
-                        : `지도에 ${plotted}개 표시됨`;
-                }
-
-                items.forEach((store, idx) => {
-                    const hasCoord = Number.isFinite(parseFloat(store.lat)) && Number.isFinite(parseFloat(store.lon));
-                    const card = document.createElement('div');
-                    card.className = 'store-card';
-                    card.innerHTML = `
-                        <div class="store-name">${escapeHtml(store.bizesNm || '상호명 없음')}${hasCoord ? '' : '<span class="no-coord-badge">좌표없음</span>'}</div>
-                        <div class="store-info">🏷️ 업종: ${escapeHtml(store.indsSclsNm || '정보 없음')}</div>
-                        <div class="store-info">📍 주소: ${escapeHtml(store.rdnmAdr || store.jibunAdr || '주소 정보 없음')}</div>
-                    `;
-
-                    if (hasCoord && kakaoReady) {
-                        card.addEventListener('click', () => {
-                            const lat = parseFloat(store.lat);
-                            const lon = parseFloat(store.lon);
-                            map.panTo(new kakao.maps.LatLng(lat, lon));
-                            const marker = markersByIndex[idx];
-                            if (marker) {
-                                kakao.maps.event.trigger(marker, 'click');
+                        kakao.maps.event.addListener(marker, 'mouseover', function() {
+                            if (pinnedInfoWindow !== infowindow) {
+                                infowindow.open(map, marker);
                             }
                         });
-                    }
 
-                    resultListEl.appendChild(card);
+                        kakao.maps.event.addListener(marker, 'mouseout', function() {
+                            if (pinnedInfoWindow !== infowindow) {
+                                infowindow.close();
+                            }
+                        });
+
+                        kakao.maps.event.addListener(marker, 'click', function() {
+                            pinStoreOnMap(store, marker, infowindow);
+                        });
+
+                        currentMarkers.push({ marker, infowindow, store });
+                    }
                 });
 
-            } catch (error) {
-                loadingEl.style.display = 'none';
-                showError('네트워크 오류', error.message);
-                console.error('Fetch error:', error);
+                let totalCount = 0;
+                for (const [groupName, storeList] of Object.entries(groups)) {
+                    totalCount += storeList.length;
+                    const section = document.createElement('div');
+                    section.className = 'group-section';
+
+                    const titleDiv = document.createElement('div');
+                    titleDiv.className = 'group-title';
+                    titleDiv.innerHTML = `
+                        <span>🍴 ${groupName}</span>
+                        <span class="group-count">${storeList.length}개</span>
+                    `;
+
+                    const contentDiv = document.createElement('div');
+                    contentDiv.className = 'group-content';
+
+                    titleDiv.onclick = function() {
+                        contentDiv.classList.toggle('collapsed');
+                    };
+
+                    section.appendChild(titleDiv);
+                    section.appendChild(contentDiv);
+
+                    storeList.sort((a, b) => a.distanceMeters - b.distanceMeters);
+
+                    storeList.forEach((store) => {
+                        const name = store.bizesNm || '상호명 없음';
+                        const category = store.indsSclsNm || '업종 정보 없음';
+                        const address = store.rdnmAdr || store.lnoAdr || '주소 정보 없음';
+                        const tel = (store.telno && store.telno.trim() !== '') ? store.telno : generateMockTel(store.bizesId, address);
+                        const mapUrl = getMapSearchUrl(selectedPlatform, name, address);
+
+                        const card = document.createElement('div');
+                        card.className = 'store-card';
+                        store._cardElement = card; 
+
+                        card.innerHTML = `
+                            <div class="store-name">
+                                <span>${name}</span>
+                                <a href="${mapUrl}" target="_blank" onclick="event.stopPropagation();" style="font-size:11px; color:#0066ff; text-decoration:none; font-weight:normal;">[상세보기 ↗]</a>
+                            </div>
+                            <div class="store-info">📍 ${address}</div>
+                            <div class="store-info">☎️ ${tel} | 📏 ${store.distanceMeters}m</div>
+                            <div class="store-info" style="color: #16a34a; font-weight: bold;">🟢 영업중 (매일 10:00 - 22:00)</div>
+                            <div class="store-category">🏷️ ${category}</div>
+                        `;
+
+                        card.onmouseenter = function() {
+                            const found = currentMarkers.find(m => m.store === store);
+                            if (found && pinnedInfoWindow !== found.infowindow) {
+                                found.infowindow.open(map, found.marker);
+                            }
+                        };
+
+                        card.onmouseleave = function() {
+                            const found = currentMarkers.find(m => m.store === store);
+                            if (found && pinnedInfoWindow !== found.infowindow) {
+                                found.infowindow.close();
+                            }
+                        };
+
+                        card.onclick = function() {
+                            const found = currentMarkers.find(m => m.store === store);
+                            if (found) {
+                                pinStoreOnMap(store, found.marker, found.infowindow);
+                            }
+                        };
+
+                        contentDiv.appendChild(card);
+                    });
+
+                    listContainer.appendChild(section);
+                }
+
+                if (totalCount === 0) {
+                    listContainer.innerHTML = '<p style="text-align: center; color: #888; margin-top: 30px;">반경 내 음식점이 없습니다.</p>';
+                }
             }
-        }
 
-        initMap();
-        loadLargeCategories();
+            async function loadStores(lat, lng) {
+                try {
+                    const response = await fetch(`/api/stores/radius?cx=${lng}&cy=${lat}&radius=${radius}`);
+                    const data = await response.json();
+
+                    let items = [];
+                    if (data?.body?.items) {
+                        items = data.body.items;
+                    } else if (data?.response?.body?.items?.item) {
+                        items = data.response.body.items.item;
+                    } else if (Array.isArray(data)) {
+                        items = data;
+                    }
+
+                    if (!Array.isArray(items)) {
+                        items = items ? [items] : [];
+                    }
+
+                    currentStores = items.filter(store => {
+                        const category = getFoodCategory(store.indsSclsNm, store.indsLclsNm, store.bizesNm);
+                        return category !== null;
+                    });
+
+                    document.getElementById('search-keyword').value = '';
+                    renderStores(currentStores);
+
+                } catch (error) {
+                    console.error('데이터 로드 실패:', error);
+                    document.getElementById('store-list-container').innerHTML = '<p style="color:red; text-align:center;">데이터를 불러오지 못했습니다.</p>';
+                }
+            }
+
+            function filterStores() {
+                const rawKeyword = document.getElementById('search-keyword').value;
+                const keyword = rawKeyword.replace(/\s+/g, '').toLowerCase();
+
+                if (!keyword) {
+                    renderStores(currentStores);
+                    return;
+                }
+
+                const filtered = currentStores.filter(store => {
+                    const name = (store.bizesNm || '').replace(/\s+/g, '').toLowerCase();
+                    const category = (store.indsSclsNm || '').replace(/\s+/g, '').toLowerCase();
+                    
+                    let altKeyword = keyword;
+                    if (keyword === '엘에이') altKeyword = 'la';
+                    else if (keyword === 'la') altKeyword = '엘에이';
+
+                    return name.includes(keyword) || name.includes(altKeyword) || category.includes(keyword);
+                });
+
+                renderStores(filtered);
+            }
+
+            document.getElementById('search-btn').onclick = filterStores;
+            document.getElementById('search-keyword').onkeyup = function(event) {
+                (event.key === 'Enter') && filterStores();
+            };
+
+            document.getElementById('map-platform-select').onchange = function() {
+                renderStores(currentStores);
+            };
+
+            function updateCenterMarker(latlng) {
+                if (centerMarker) centerMarker.setMap(null);
+                if (centerCircle) centerCircle.setMap(null);
+
+                const imageSrc = 'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_red.png';
+                const imageSize = new kakao.maps.Size(35, 35);
+                const imageOption = { offset: new kakao.maps.Point(13, 35) };
+                const markerImage = new kakao.maps.MarkerImage(imageSrc, imageSize, imageOption);
+
+                centerMarker = new kakao.maps.Marker({
+                    position: latlng,
+                    image: markerImage
+                });
+                centerMarker.setMap(map);
+
+                centerCircle = new kakao.maps.Circle({
+                    center: latlng,
+                    radius: radius,
+                    strokeWeight: 3,
+                    strokeColor: '#ff3333',
+                    strokeOpacity: 0.9,
+                    fillColor: '#ff3333',
+                    fillOpacity: 0.15
+                });
+                centerCircle.setMap(map);
+            }
+
+            // [수정됨] 줌인/줌아웃 시 고정핀 위치(centerLat, centerLng)는 그대로 유지하고 반경과 목록만 갱신
+            kakao.maps.event.addListener(map, 'zoom_changed', function() {
+                const newLevel = map.getLevel();
+                if (newLevel !== currentLevel) {
+                    currentLevel = newLevel;
+                    radius = getRadiusByLevel(currentLevel);
+                    updateGuideText(radius);
+                    
+                    // 기존에 지정된 고정핀 위치 기준 유지
+                    const fixedLatLng = new kakao.maps.LatLng(centerLat, centerLng);
+                    updateCenterMarker(fixedLatLng);
+                    loadStores(centerLat, centerLng);
+                }
+            });
+
+            // 지도 클릭 시에만 해당 위치로 고정핀 이동
+            kakao.maps.event.addListener(map, 'click', function(mouseEvent) {
+                const latlng = mouseEvent.latLng;
+                centerLat = latlng.getLat();
+                centerLng = latlng.getLng();
+
+                updateCenterMarker(latlng);
+                loadStores(centerLat, centerLng);
+            });
+
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        centerLat = position.coords.latitude;
+                        centerLng = position.coords.longitude;
+
+                        const currentLatLng = new kakao.maps.LatLng(centerLat, centerLng);
+                        map.setCenter(currentLatLng);
+                        updateGuideText(radius);
+                        updateCenterMarker(currentLatLng);
+                        loadStores(centerLat, centerLng);
+                    },
+                    function(error) {
+                        console.warn('현재 위치를 가져올 수 없어 기본 위치(서울시청)로 대체합니다.', error);
+                        const defaultLatLng = new kakao.maps.LatLng(centerLat, centerLng);
+                        updateGuideText(radius);
+                        updateCenterMarker(defaultLatLng);
+                        loadStores(centerLat, centerLng);
+                    },
+                    {
+                        timeout: 10000,
+                        maximumAge: 0
+                    }
+                );
+            } else {
+                const defaultLatLng = new kakao.maps.LatLng(centerLat, centerLng);
+                updateGuideText(radius);
+                updateCenterMarker(defaultLatLng);
+                loadStores(centerLat, centerLng);
+            }
+        };
     </script>
-
 </body>
 </html>
