@@ -116,12 +116,13 @@
                 isDragging = true;
                 startY = e.touches[0].clientY;
                 startHeight = sidebar.offsetHeight;
-                e.preventDefault();
-            });
+                e.stopPropagation();
+            }, { passive: true });
 
             window.addEventListener('touchmove', (e) => {
                 if (!isDragging) return;
-                const deltaY = startY - e.touches[0].clientY;
+                const currentY = e.touches[0].clientY;
+                const deltaY = startY - currentY;
                 let newHeight = startHeight + deltaY;
                 const maxHeight = window.innerHeight * 0.9;
                 const minHeight = window.innerHeight * 0.12;
@@ -130,7 +131,7 @@
                 if (newHeight < minHeight) newHeight = minHeight;
 
                 sidebar.style.height = newHeight + 'px';
-            });
+            }, { passive: true });
 
             window.addEventListener('touchend', () => {
                 isDragging = false;
