@@ -112,7 +112,6 @@
             
             .geolocation-btn { top: 15px; right: 15px; padding: 6px 10px; font-size: 12px; }
 
-            /* 구글맵 스타일의 모바일 바텀시트 전환 효과 (CSS 트랜지션 적용) */
             #sidebar { 
                 position: absolute; 
                 bottom: 0; 
@@ -133,7 +132,7 @@
 </head>
 <body>
 
-    <div id="map" id="map-container">
+    <div id="map">
         <button id="current-location-btn" class="geolocation-btn">
             📍 내 위치로 이동
         </button>
@@ -177,13 +176,12 @@
             const dragHandle = document.getElementById('drag-handle');
             const sidebarHeader = document.getElementById('sidebar-header-toggle');
 
-            // 구글맵 모바일 바텀시트 스와이프/터치 인터랙션 구현
             let startY = 0;
             let startHeight = 0;
             const heights = {
-                peek: window.innerHeight * 0.12,  // 최소 (지도 넓게 보기)
-                half: window.innerHeight * 0.35,  // 기본
-                full: window.innerHeight * 0.88   // 최대 (목록 넓게 보기)
+                peek: window.innerHeight * 0.12,
+                half: window.innerHeight * 0.35,
+                full: window.innerHeight * 0.88
             };
 
             function setSidebarHeight(h) {
@@ -206,12 +204,12 @@
             dragHandle.addEventListener('touchstart', function(e) {
                 startY = e.touches[0].clientY;
                 startHeight = sidebar.offsetHeight;
-                sidebar.style.transition = 'none'; // 드래그 중에는 애니메이션 제거
+                sidebar.style.transition = 'none';
             }, { passive: true });
 
             dragHandle.addEventListener('touchmove', function(e) {
                 const currentY = e.touches[0].clientY;
-                const deltaY = startY - currentY; // 위로 드래그하면 양수
+                const deltaY = startY - currentY;
                 setSidebarHeight(startHeight + deltaY);
             }, { passive: true });
 
@@ -220,7 +218,6 @@
                 snapToNearestHeight(sidebar.offsetHeight);
             });
 
-            // 헤더 클릭 시 토글 (절반 <-> 최대)
             sidebarHeader.onclick = function() {
                 if (window.innerWidth <= 768) {
                     const currentH = sidebar.offsetHeight;
@@ -232,7 +229,6 @@
                 }
             };
 
-            // 지도 영역 클릭 시 시트를 최소화하여 지도 넓게 보기
             mapContainer.onclick = function(e) {
                 if (e.target.id === 'current-location-btn' || e.target.closest('#current-location-btn')) return;
                 if (window.innerWidth <= 768) {
@@ -252,21 +248,10 @@
             let centerLat = 37.566535;
             let centerLng = 126.977969;
             
-            function getRadiusByLevel(level) {
-                if (level === 1) return 100;
-                if (level === 2) return 250;
-                if (level === 3) return 500;
-                if (level === 4) return 1000;
-                if (level === 5) return 2000;
-                if (level === 6) return 3500;
-                if (level === 7) return 5000;
-                if (level === 8) return 8000;
-                return 10000;
-            }
+            // 반경을 500m로 고정
+            const fixedRadius = 500;
 
-            let currentLevel = 4;
-            let radius = getRadiusByLevel(currentLevel);
-
+            let currentLevel = 3; // 500m 반경에 적절한 기본 줌 레벨
             const container = document.getElementById('map');
             const options = {
                 center: new kakao.maps.LatLng(centerLat, centerLng),
@@ -361,9 +346,8 @@
                 }
             };
 
-            function updateGuideText(r, addressName) {
+            function updateGuideText(addressName) {
                 const guideEl = document.getElementById('guide-text-msg');
-                let rangeStr = r >= 1000 ? `${(r / 1000).toFixed(1).replace(/\.0$/, '')}km` : `${r}m`;
                 
                 if (isWishlistMode) {
                     guideEl.innerHTML = `❤️ <strong>찜한 음식점 목록</strong>을 조회 중입니다. (${wishlist.length}개)`;
@@ -371,9 +355,9 @@
                 }
 
                 if (addressName) {
-                    guideEl.innerHTML = `📍 <strong>중심 위치:</strong> ${addressName}<br>📍 반경 <strong>${rangeStr}</strong> 내 음식점`;
+                    guideEl.innerHTML = `📍 <strong>중심 위치:</strong> ${addressName}<br>🚶 반경 <strong>500m (도보권)</strong> 내 음식점`;
                 } else {
-                    guideEl.innerHTML = `📍 현재 위치 기준 반경 <strong>${rangeStr}</strong> 내 음식점을 불러옵니다.`;
+                    guideEl.innerHTML = `📍 현재 위치 기준 반경 <strong>500m (도보권)</strong> 내 음식점을 불러옵니다.`;
                 }
             }
 
@@ -686,7 +670,7 @@
                 }
 
                 if (totalCount === 0) {
-                    listContainer.innerHTML = '<p style="text-align: center; color: #888; margin-top: 30px;">반경 내 음식점이 없습니다.</p>';
+                    listContainer.innerHTML = '<p style="text-align: center; color: #888; margin-top: 30px;">반경 500m 내 음식점이 없습니다.</p>';
                 }
             }
 
@@ -708,7 +692,7 @@
                 const listContainer = document.getElementById('store-list-container');
                 listContainer.innerHTML = '';
                 clearMarkers();
-                updateGuideText(radius, null);
+                updateGuideText(null);
 
                 if (wishlist.length === 0) {
                     listContainer.innerHTML = '<p style="text-align: center; color: #888; margin-top: 50px;">찜한 음식점이 없습니다. 마음에 드는 식당에 하트를 눌러보세요!</p>';
@@ -799,7 +783,7 @@
                 listContainer.appendChild(section);
             }
 
-            // 속도 개선을 위한 디바운스(Debounce) 적용 함수
+            // 디바운스 적용 및 반경 500m 고정 호출
             let loadTimer = null;
             function loadStoresDebounced(lat, lng) {
                 if (isWishlistMode) return;
@@ -809,7 +793,7 @@
                 
                 loadTimer = setTimeout(async () => {
                     try {
-                        const response = await fetch(`/api/stores/radius?cx=${lng}&cy=${lat}&radius=${radius}&numOfRows=500`);
+                        const response = await fetch(`/api/stores/radius?cx=${lng}&cy=${lat}&radius=${fixedRadius}&numOfRows=300`);
                         const data = await response.json();
 
                         let items = [];
@@ -828,7 +812,7 @@
                         console.error('데이터 로드 실패:', error);
                         document.getElementById('store-list-container').innerHTML = '<p style="color:red; text-align:center;">데이터를 불러오지 못했습니다.</p>';
                     }
-                }, 300); // 0.3초 지연을 주어 연속 이벤트 발생 시 렌더링 부하 및 지연 방지
+                }, 300);
             }
 
             function filterStores() {
@@ -881,9 +865,10 @@
                 });
                 centerMarker.setMap(map);
 
+                // 고정된 반경 500m 원 표시
                 centerCircle = new kakao.maps.Circle({
                     center: latlng,
-                    radius: radius,
+                    radius: fixedRadius,
                     strokeWeight: 2,
                     strokeColor: '#ff4d4d',
                     strokeOpacity: 0.8,
@@ -892,7 +877,7 @@
                 });
                 centerCircle.setMap(map);
 
-                updateGuideText(radius, null);
+                updateGuideText(null);
 
                 searchDetailAddrFromCoords(latlng, function(result, status) {
                     if (status === kakao.maps.services.Status.OK) {
@@ -900,10 +885,10 @@
                         let jibunAddr = result[0].address ? result[0].address.address_name : '';
                         let fullAddress = detailAddr || jibunAddr || '주소 정보 없음';
 
-                        updateGuideText(radius, fullAddress);
+                        updateGuideText(fullAddress);
 
                         centerInfoWindow = new kakao.maps.InfoWindow({
-                            content: `<div style="padding:8px 12px; font-size:12px; font-weight:bold; color:#d32f2f;">📍 선택된 중심 위치<br><span style="font-weight:normal; color:#333;">${fullAddress}</span></div>`,
+                            content: `<div style="padding:8px 12px; font-size:12px; font-weight:bold; color:#d32f2f;">📍 선택된 중심 위치 (반경 500m)<br><span style="font-weight:normal; color:#333;">${fullAddress}</span></div>`,
                             removable: true
                         });
 
@@ -946,18 +931,12 @@
                 );
             };
 
+            // 줌 변경 시 반경은 500m로 유지되므로 데이터 재호출 불필요 (지도 확대/축소 속도 향상)
             kakao.maps.event.addListener(map, 'zoom_changed', function() {
-                const newLevel = map.getLevel();
-                if (newLevel !== currentLevel) {
-                    currentLevel = newLevel;
-                    radius = getRadiusByLevel(currentLevel);
-                    
-                    const fixedLatLng = new kakao.maps.LatLng(centerLat, centerLng);
-                    updateCenterMarker(fixedLatLng);
-                    loadStoresDebounced(centerLat, centerLng);
-                }
+                // 줌 레벨 상태만 동기화
             });
 
+            // 지도를 클릭하면 해당 위치로 중심점 변경 및 반경 500m 데이터 조회
             kakao.maps.event.addListener(map, 'click', function(mouseEvent) {
                 if (window.innerWidth <= 768) {
                     setSidebarHeight(heights.peek);
