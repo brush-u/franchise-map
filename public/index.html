@@ -287,7 +287,8 @@
                 if (isWishlistMode) {
                     renderWishlist();
                 } else {
-                    renderStores(currentStores, new kakao.maps.LatLng(centerLat, centerLng));
+                    // 현재 검색어 입력창의 값에 따라 필터 유지하며 갱신
+                    filterStores();
                 }
             }
 
@@ -818,11 +819,10 @@
 
             document.getElementById('map-platform-select').onchange = function() {
                 if (isWishlistMode) renderWishlist();
-                else renderStores(currentStores, new kakao.maps.LatLng(centerLat, centerLng));
+                else filterStores();
             };
 
             function updateCenterMarker(latlng) {
-                // 1. 마커와 원을 즉시 표시하여 속도 개선
                 if (centerMarker) centerMarker.setMap(null);
                 if (centerCircle) centerCircle.setMap(null);
                 if (centerInfoWindow) centerInfoWindow.close();
@@ -849,10 +849,8 @@
                 });
                 centerCircle.setMap(map);
 
-                // 초기 안내 텍스트 먼저 갱신
                 updateGuideText(radius, null);
 
-                // 2. 주소 변환(Geocoding)은 비동기로 처리하여 UI 반응 속도를 빠르게 유지
                 searchDetailAddrFromCoords(latlng, function(result, status) {
                     if (status === kakao.maps.services.Status.OK) {
                         let detailAddr = result[0].road_address ? result[0].road_address.address_name : '';
