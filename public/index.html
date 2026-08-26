@@ -178,7 +178,6 @@
             let centerLat = 37.566535;
             let centerLng = 126.977969;
             
-            // 지도 확대 레벨별 반경 설정 (최대 확대 레벨 1~2일 때 50m, 100m 지원)
             function getRadiusByLevel(level) {
                 if (level === 1) return 50;     
                 if (level === 2) return 100;    
@@ -344,15 +343,21 @@
             }
 
             function pinStoreOnMap(store, marker, infowindow) {
+                // 이미 열려있는 풍선말을 다시 누르면 닫기 (토글 기능)
+                if (pinnedInfoWindow === infowindow) {
+                    infowindow.close();
+                    pinnedInfoWindow = null;
+                    if (store._cardElement) {
+                        store._cardElement.classList.remove('selected');
+                    }
+                    return;
+                }
+
                 if (pinnedInfoWindow) {
                     pinnedInfoWindow.close();
                 }
                 infowindow.open(map, marker);
                 pinnedInfoWindow = infowindow;
-
-                const moveLatLon = new kakao.maps.LatLng(store.lat, store.lon);
-                map.setCenter(moveLatLon);
-                map.setLevel(3);
 
                 document.querySelectorAll('.store-card').forEach(c => c.classList.remove('selected'));
                 if (store._cardElement) {
@@ -628,6 +633,13 @@
             });
 
             kakao.maps.event.addListener(map, 'click', function(mouseEvent) {
+                // 빈 지도를 클릭했을 때 열려있던 풍선말 닫기 및 선택 해제
+                if (pinnedInfoWindow) {
+                    pinnedInfoWindow.close();
+                    pinnedInfoWindow = null;
+                }
+                document.querySelectorAll('.store-card').forEach(c => c.classList.remove('selected'));
+
                 const latlng = mouseEvent.latLng;
                 centerLat = latlng.getLat();
                 centerLng = latlng.getLng();
