@@ -629,21 +629,21 @@
                 if (centerMarker) centerMarker.setMap(null);
                 if (centerCircle) centerCircle.setMap(null);
 
-                // 기존 기본 마커 스타일 적용
+                // 카카오맵 기본 마커 (빨간색 계통 기본 마커) 적용
                 centerMarker = new kakao.maps.Marker({
                     position: latlng
                 });
                 centerMarker.setMap(map);
 
-                // 기존 기본 반경 원 스타일 적용 (투명한 회색/기본 색상 계열)
+                // 반경 원 색상을 빨간색 계통으로 적용
                 centerCircle = new kakao.maps.Circle({
                     center: latlng,
                     radius: radius,
                     strokeWeight: 2,
-                    strokeColor: '#75B8FA',
+                    strokeColor: '#ff4d4d',   // 빨간색 테두리
                     strokeOpacity: 0.8,
-                    fillColor: '#CFE7FF',
-                    fillOpacity: 0.3
+                    fillColor: '#ff4d4d',     // 빨간색 채우기
+                    fillOpacity: 0.2          // 은은하게 보이도록 투명도 설정
                 });
                 centerCircle.setMap(map);
             }
