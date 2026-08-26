@@ -18,8 +18,7 @@
         .global-toggle-btn:hover, .wishlist-tab-btn:hover { background: rgba(255, 255, 255, 0.3); }
         .wishlist-tab-btn.active { background: white; color: #0066ff; font-weight: bold; border-color: white; }
 
-        /* 구글맵 스타일의 부드러운 모바일 바텀시트 핸들 영역 */
-        .mobile-handle-bar { display: none; width: 100%; height: 32px; background: #f8f9fa; align-items: center; justify-content: center; cursor: grab; border-top: 1px solid #ddd; border-radius: 16px 16px 0 0; user-select: none; touch-action: none; }
+        .mobile-handle-bar { display: none; width: 100%; height: 28px; background: #f8f9fa; align-items: center; justify-content: center; cursor: grab; border-top: 1px solid #ddd; border-radius: 16px 16px 0 0; user-select: none; touch-action: none; flex-shrink: 0; }
         .mobile-handle-bar:active { cursor: grabbing; }
         .mobile-handle { width: 40px; height: 5px; background: #cbd5e1; border-radius: 3px; }
 
@@ -117,7 +116,7 @@
                 bottom: 0; 
                 left: 0; 
                 width: 100%; 
-                height: 35vh; 
+                height: 38vh; 
                 z-index: 10; 
                 border-left: none; 
                 border-top: 1px solid #ddd;
@@ -178,19 +177,22 @@
 
             let startY = 0;
             let startHeight = 0;
-            const heights = {
+            
+            const getHeights = () => ({
                 peek: window.innerHeight * 0.12,
-                half: window.innerHeight * 0.35,
+                half: window.innerHeight * 0.38,
                 full: window.innerHeight * 0.88
-            };
+            });
 
             function setSidebarHeight(h) {
                 if (window.innerWidth <= 768) {
+                    const heights = getHeights();
                     sidebar.style.height = Math.max(heights.peek, Math.min(heights.full, h)) + 'px';
                 }
             }
 
             function snapToNearestHeight(currentH) {
+                const heights = getHeights();
                 const diffPeek = Math.abs(currentH - heights.peek);
                 const diffHalf = Math.abs(currentH - heights.half);
                 const diffFull = Math.abs(currentH - heights.full);
@@ -218,8 +220,31 @@
                 snapToNearestHeight(sidebar.offsetHeight);
             });
 
+            let isDragging = false;
+            dragHandle.addEventListener('mousedown', function(e) {
+                isDragging = true;
+                startY = e.clientY;
+                startHeight = sidebar.offsetHeight;
+                sidebar.style.transition = 'none';
+                e.preventDefault();
+            });
+
+            window.addEventListener('mousemove', function(e) {
+                if (!isDragging) return;
+                const deltaY = startY - e.clientY;
+                setSidebarHeight(startHeight + deltaY);
+            });
+
+            window.addEventListener('mouseup', function() {
+                if (!isDragging) return;
+                isDragging = false;
+                sidebar.style.transition = 'height 0.25s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                snapToNearestHeight(sidebar.offsetHeight);
+            });
+
             sidebarHeader.onclick = function() {
                 if (window.innerWidth <= 768) {
+                    const heights = getHeights();
                     const currentH = sidebar.offsetHeight;
                     if (currentH < heights.full * 0.7) {
                         setSidebarHeight(heights.full);
@@ -232,7 +257,7 @@
             mapContainer.onclick = function(e) {
                 if (e.target.id === 'current-location-btn' || e.target.closest('#current-location-btn')) return;
                 if (window.innerWidth <= 768) {
-                    setSidebarHeight(heights.peek);
+                    setSidebarHeight(getHeights().peek);
                 }
             };
 
@@ -247,11 +272,9 @@
 
             let centerLat = 37.566535;
             let centerLng = 126.977969;
-            
-            // 반경을 500m로 고정
             const fixedRadius = 500;
 
-            let currentLevel = 3; // 500m 반경에 적절한 기본 줌 레벨
+            let currentLevel = 3;
             const container = document.getElementById('map');
             const options = {
                 center: new kakao.maps.LatLng(centerLat, centerLng),
@@ -783,7 +806,6 @@
                 listContainer.appendChild(section);
             }
 
-            // 디바운스 적용 및 반경 500m 고정 호출
             let loadTimer = null;
             function loadStoresDebounced(lat, lng) {
                 if (isWishlistMode) return;
@@ -865,7 +887,6 @@
                 });
                 centerMarker.setMap(map);
 
-                // 고정된 반경 500m 원 표시
                 centerCircle = new kakao.maps.Circle({
                     center: latlng,
                     radius: fixedRadius,
@@ -931,15 +952,12 @@
                 );
             };
 
-            // 줌 변경 시 반경은 500m로 유지되므로 데이터 재호출 불필요 (지도 확대/축소 속도 향상)
             kakao.maps.event.addListener(map, 'zoom_changed', function() {
-                // 줌 레벨 상태만 동기화
             });
 
-            // 지도를 클릭하면 해당 위치로 중심점 변경 및 반경 500m 데이터 조회
             kakao.maps.event.addListener(map, 'click', function(mouseEvent) {
                 if (window.innerWidth <= 768) {
-                    setSidebarHeight(heights.peek);
+                    setSidebarHeight(getHeights().peek);
                 }
 
                 if (pinnedInfoWindow) {
