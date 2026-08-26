@@ -3,1014 +3,186 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>뭐 먹지? 근처 맛집 찾기</title>
-    <!-- 카카오 지도 SDK (services 라이브러리 포함) -->
-    <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=__KAKAO_API_KEY__&libraries=services"></script>
+    <title>음식점 데이터 정제 및 필터링 뷰어</title>
     <style>
-        body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; display: flex; height: 100vh; overflow: hidden; background: #000; }
-        #map { flex: 2; height: 100%; position: relative; }
-        #sidebar { flex: 1; height: 100%; background: #121212; color: #fff; border-left: 1px solid #2a2a2a; display: flex; flex-direction: column; }
-        
-        .sidebar-header { padding: 15px 20px; background: #1e1e1e; color: white; font-size: 16px; font-weight: bold; display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; border-bottom: 1px solid #2a2a2a; }
-        
-        .header-btn-wrap { display: flex; gap: 6px; }
-        .global-toggle-btn, .wishlist-tab-btn { background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); color: white; padding: 4px 8px; font-size: 12px; border-radius: 4px; cursor: pointer; font-weight: normal; }
-        .global-toggle-btn:hover, .wishlist-tab-btn:hover { background: rgba(255, 255, 255, 0.2); }
-        .wishlist-tab-btn.active { background: #0066ff; color: white; font-weight: bold; border-color: #0066ff; }
-
-        .mobile-handle-bar { display: none; width: 100%; height: 28px; background: #1e1e1e; align-items: center; justify-content: center; cursor: grab; border-top: 1px solid #2a2a2a; border-radius: 20px 20px 0 0; user-select: none; touch-action: none; flex-shrink: 0; }
-        .mobile-handle-bar:active { cursor: grabbing; }
-        .mobile-handle { width: 36px; height: 4px; background: #555; border-radius: 2px; }
-
-        .search-control-container { padding: 10px 15px; background: #181818; border-bottom: 1px solid #2a2a2a; display: flex; flex-direction: column; gap: 8px; }
-        .search-row { display: flex; gap: 8px; align-items: center; }
-        .search-input { flex: 1; padding: 8px 12px; border: 1px solid #333; background: #222; color: #fff; border-radius: 6px; font-size: 14px; outline: none; }
-        .search-input:focus { border-color: #0066ff; }
-        
-        .map-selector { padding: 8px 10px; font-size: 13px; border-radius: 6px; border: 1px solid #333; background: #222; color: #60a5fa; font-weight: bold; cursor: pointer; outline: none; width: 105px; }
-        
-        .search-btn { padding: 8px 14px; background: #0066ff; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
-        .search-btn:hover { background: #0052cc; }
-
-        .geolocation-btn {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            z-index: 5;
-            background: #1e1e1e;
-            border: 1px solid #333;
-            padding: 8px 14px;
-            border-radius: 20px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            font-weight: bold;
-            font-size: 13px;
-            color: #fff;
-            cursor: pointer;
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h2 {
+            margin-bottom: 20px;
+            color: #2c3e50;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+        .controls {
             display: flex;
-            align-items: center;
-            gap: 5px;
-            outline: none;
-            transition: 0.2s;
+            gap: 10px;
+            margin-bottom: 20px;
         }
-        .geolocation-btn:hover {
-            background: #2a2a2a;
-            border-color: #0066ff;
-        }
-
-        .store-list { flex: 1; overflow-y: auto; padding: 15px; background: #121212; }
-        
-        .group-section { margin-bottom: 20px; }
-        .group-title { font-size: 14px; font-weight: bold; color: #aaa; margin-bottom: 10px; padding-bottom: 5px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; }
-        .group-title:hover { color: #fff; }
-        .group-count-wrap { display: flex; align-items: center; gap: 8px; }
-        .group-count { background: #333; color: #fff; font-size: 11px; padding: 2px 6px; border-radius: 10px; }
-        .toggle-icon { font-size: 12px; color: #888; transition: transform 0.2s; }
-        
-        .group-content { display: flex; flex-direction: column; gap: 10px; transition: all 0.3s ease; }
-        .group-content.collapsed { display: none; }
-
-        /* 네이티브 앱 감성의 카드 디자인 스타일 */
-        .store-card { background: #1a1a1a; padding: 16px; border-radius: 12px; border: 1px solid #2a2a2a; box-shadow: 0 4px 10px rgba(0,0,0,0.2); cursor: pointer; transition: 0.2s; position: relative; }
-        .store-card:hover { background: #222; border-color: #444; transform: translateY(-2px); }
-        .store-card.selected { background: #1c2638; border-color: #0066ff; }
-        
-        .native-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
-        .store-name { font-size: 16px; font-weight: bold; color: #fff; display: flex; align-items: center; gap: 6px; }
-        
-        .rating-badge {
-            color: #fbbf24;
-            font-size: 13px;
+        button {
+            padding: 10px 20px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
             font-weight: bold;
-            display: inline-flex;
-            align-items: center;
-            gap: 2px;
         }
-        .review-count { color: #888; font-weight: normal; font-size: 12px; }
-
-        .store-sub-info { font-size: 12px; color: #aaa; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
-        .store-status-row { font-size: 12px; margin: 8px 0 12px 0; display: flex; align-items: center; justify-content: space-between; }
-        .status-open { color: #22c55e; font-weight: bold; }
-
-        /* 네이티브 앱 감성의 액션 버튼 바 ([경로], [시작], [통화], [공유]) */
-        .native-action-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; border-top: 1px solid #2a2a2a; padding-top: 12px; margin-top: 8px; }
-        .native-action-btn { background: #252525; border: 1px solid #333; color: #fff; padding: 8px 0; border-radius: 20px; font-size: 12px; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 4px; cursor: pointer; text-decoration: none; transition: 0.15s; }
-        .native-action-btn:hover { background: #0066ff; border-color: #0066ff; }
-
-        .wish-btn { background: transparent; border: none; font-size: 18px; cursor: pointer; padding: 0; transition: transform 0.1s; }
-        .wish-btn:active { transform: scale(1.25); }
-
-        .guide-text { padding: 8px 15px; background: #162032; color: #60a5fa; font-size: 12px; border-bottom: 1px solid #1e3a8a; line-height: 1.4; }
-
-        @media (max-width: 768px) {
-            body { flex-direction: column; height: 100vh; position: relative; }
-            #map { width: 100%; height: 100%; flex: none; position: absolute; top: 0; left: 0; z-index: 1; }
-            
-            .geolocation-btn { top: 15px; right: 15px; padding: 6px 12px; font-size: 12px; }
-
-            #sidebar { 
-                position: absolute; 
-                bottom: 0; 
-                left: 0; 
-                width: 100%; 
-                height: 42vh; 
-                z-index: 10; 
-                border-left: none; 
-                border-top: 1px solid #2a2a2a;
-                box-shadow: 0 -8px 24px rgba(0,0,0,0.5);
-                border-radius: 20px 20px 0 0;
-                transition: height 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
-            }
-
-            .mobile-handle-bar { display: flex; }
+        button:hover {
+            background-color: #2980b9;
+        }
+        .stats {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        .stats div {
+            background: #ecf0f1;
+            padding: 10px 15px;
+            border-radius: 4px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+            font-size: 14px;
+        }
+        th {
+            background-color: #f8f9fa;
+            color: #2c3e50;
+        }
+        tr:hover {
+            background-color: #f1f2f6;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        .badge-food {
+            background-color: #e8f8f5;
+            color: #1abc9c;
+        }
+        .badge-dropped {
+            background-color: #fdebd0;
+            color: #e67e22;
         }
     </style>
 </head>
 <body>
 
-    <div id="map">
-        <button id="current-location-btn" class="geolocation-btn">
-            📍 내 위치
-        </button>
+<div class="container">
+    <h2>원천 데이터 필터링 및 검증 시스템</h2>
+    
+    <div class="controls">
+        <button onclick="runFilteringProcess()">데이터 정제 실행</button>
     </div>
 
-    <div id="sidebar">
-        <div class="mobile-handle-bar" id="drag-handle">
-            <div class="mobile-handle"></div>
-        </div>
-
-        <div class="sidebar-header" id="sidebar-header-toggle">
-            <span>🍽️ 뭐 먹지? 근처 맛집 찾기</span>
-            <div class="header-btn-wrap" onclick="event.stopPropagation();">
-                <button id="wishlist-tab-btn" class="wishlist-tab-btn">❤️ 찜 (0)</button>
-                <button id="global-toggle-btn" class="global-toggle-btn">모두 접기</button>
-            </div>
-        </div>
-        <div class="guide-text" id="guide-text-msg">💡 지도를 클릭하거나 위치를 이동하여 중심점을 지정하세요.</div>
-        
-        <div class="search-control-container">
-            <div class="search-row">
-                <select id="map-platform-select" class="map-selector">
-                    <option value="google">구글 맵</option>
-                    <option value="kakao">카카오맵</option>
-                    <option value="naver">네이버 지도</option>
-                </select>
-                <input type="text" id="search-keyword" class="search-input" placeholder="음식점 이름 또는 업종 검색">
-                <button id="search-btn" class="search-btn">찾기</button>
-            </div>
-        </div>
-
-        <div class="store-list" id="store-list-container">
-            <p id="status-msg" style="text-align: center; color: #888; margin-top: 50px;">현재 위치를 확인하는 중...</p>
-        </div>
+    <div class="stats">
+        <div id="totalCount">전체 원본: 0건</div>
+        <div id="validCount">정상 음식점: 0건</div>
+        <div id="droppedCount">차단된 비음식점: 0건</div>
     </div>
 
-    <script>
-        window.onload = function() {
-            const sidebar = document.getElementById('sidebar');
-            const mapContainer = document.getElementById('map');
-            const dragHandle = document.getElementById('drag-handle');
-            const sidebarHeader = document.getElementById('sidebar-header-toggle');
-
-            let startY = 0;
-            let startHeight = 0;
-            
-            const getHeights = () => ({
-                peek: window.innerHeight * 0.12,
-                half: window.innerHeight * 0.42,
-                full: window.innerHeight * 0.88
-            });
-
-            function setSidebarHeight(h) {
-                if (window.innerWidth <= 768) {
-                    const heights = getHeights();
-                    sidebar.style.height = Math.max(heights.peek, Math.min(heights.full, h)) + 'px';
-                }
-            }
-
-            function snapToNearestHeight(currentH) {
-                const heights = getHeights();
-                const diffPeek = Math.abs(currentH - heights.peek);
-                const diffHalf = Math.abs(currentH - heights.half);
-                const diffFull = Math.abs(currentH - heights.full);
-
-                const min = Math.min(diffPeek, diffHalf, diffFull);
-                if (min === diffPeek) setSidebarHeight(heights.peek);
-                else if (min === diffHalf) setSidebarHeight(heights.half);
-                else setSidebarHeight(heights.full);
-            }
-
-            dragHandle.addEventListener('touchstart', function(e) {
-                startY = e.touches[0].clientY;
-                startHeight = sidebar.offsetHeight;
-                sidebar.style.transition = 'none';
-            }, { passive: true });
-
-            dragHandle.addEventListener('touchmove', function(e) {
-                const currentY = e.touches[0].clientY;
-                const deltaY = startY - currentY;
-                setSidebarHeight(startHeight + deltaY);
-            }, { passive: true });
-
-            dragHandle.addEventListener('touchend', function() {
-                sidebar.style.transition = 'height 0.25s cubic-bezier(0.2, 0.8, 0.2, 1)';
-                snapToNearestHeight(sidebar.offsetHeight);
-            });
-
-            let isDragging = false;
-            dragHandle.addEventListener('mousedown', function(e) {
-                isDragging = true;
-                startY = e.clientY;
-                startHeight = sidebar.offsetHeight;
-                sidebar.style.transition = 'none';
-                e.preventDefault();
-            });
-
-            window.addEventListener('mousemove', function(e) {
-                if (!isDragging) return;
-                const deltaY = startY - e.clientY;
-                setSidebarHeight(startHeight + deltaY);
-            });
-
-            window.addEventListener('mouseup', function() {
-                if (!isDragging) return;
-                isDragging = false;
-                sidebar.style.transition = 'height 0.25s cubic-bezier(0.2, 0.8, 0.2, 1)';
-                snapToNearestHeight(sidebar.offsetHeight);
-            });
-
-            sidebarHeader.onclick = function() {
-                if (window.innerWidth <= 768) {
-                    const heights = getHeights();
-                    const currentH = sidebar.offsetHeight;
-                    if (currentH < heights.full * 0.7) {
-                        setSidebarHeight(heights.full);
-                    } else {
-                        setSidebarHeight(heights.half);
-                    }
-                }
-            };
-
-            mapContainer.onclick = function(e) {
-                if (e.target.id === 'current-location-btn' || e.target.closest('#current-location-btn')) return;
-                if (window.innerWidth <= 768) {
-                    setSidebarHeight(getHeights().peek);
-                }
-            };
-
-            const statusMsg = document.getElementById('status-msg');
-
-            if (typeof kakao === 'undefined' || !kakao.maps) {
-                statusMsg.innerHTML = '<span style="color:red;">❌ 카카오 지도 SDK 로드 실패</span>';
-                return;
-            }
-
-            statusMsg.innerHTML = '지도를 초기화하는 중...';
-
-            let centerLat = 37.566535;
-            let centerLng = 126.977969;
-            const fixedRadius = 500;
-
-            let currentLevel = 3;
-            const container = document.getElementById('map');
-            const options = {
-                center: new kakao.maps.LatLng(centerLat, centerLng),
-                level: currentLevel
-            };
-            const map = new kakao.maps.Map(container, options);
-
-            const geocoder = new kakao.maps.services.Geocoder();
-
-            let centerMarker = null;
-            let centerCircle = null;
-            let centerInfoWindow = null;
-            let currentMarkers = []; 
-            let pinnedInfoWindow = null; 
-            let currentStores = []; 
-            let isAllCollapsed = false;
-            let isWishlistMode = false;
-            
-            let wishlist = JSON.parse(localStorage.getItem('my_store_wishlist') || '[]');
-
-            function updateWishlistButtonCount() {
-                const wishBtn = document.getElementById('wishlist-tab-btn');
-                wishBtn.innerText = `❤️ 찜 (${wishlist.length})`;
-                if (isWishlistMode) {
-                    wishBtn.classList.add('active');
-                } else {
-                    wishBtn.classList.remove('active');
-                }
-            }
-            updateWishlistButtonCount();
-
-            function getStoreKey(store) {
-                return store.bizesId || (store.bizesNm + '_' + (store.rdnmAdr || store.lnoAdr));
-            }
-
-            function isWished(store) {
-                const key = getStoreKey(store);
-                return wishlist.includes(key);
-            }
-
-            function toggleWish(store, event) {
-                if (event) event.stopPropagation();
-                const key = getStoreKey(store);
-                const index = wishlist.indexOf(key);
-
-                if (index > -1) {
-                    wishlist.splice(index, 1);
-                } else {
-                    wishlist.push(key);
-                }
-
-                localStorage.setItem('my_store_wishlist', JSON.stringify(wishlist));
-                updateWishlistButtonCount();
-
-                if (isWishlistMode) {
-                    renderWishlist();
-                } else {
-                    filterStores();
-                }
-            }
-
-            const globalToggleBtn = document.getElementById('global-toggle-btn');
-            globalToggleBtn.onclick = function() {
-                isAllCollapsed = !isAllCollapsed;
-                const contents = document.querySelectorAll('.group-content');
-                const icons = document.querySelectorAll('.group-title .toggle-icon');
-
-                contents.forEach((content, index) => {
-                    if (isAllCollapsed) {
-                        content.classList.add('collapsed');
-                        if (icons[index]) icons[index].style.transform = 'rotate(-90deg)';
-                    } else {
-                        content.classList.remove('collapsed');
-                        if (icons[index]) icons[index].style.transform = 'rotate(0deg)';
-                    }
-                });
-
-                globalToggleBtn.innerText = isAllCollapsed ? '모두 펼치기' : '모두 접기';
-            };
-
-            const wishlistTabBtn = document.getElementById('wishlist-tab-btn');
-            wishlistTabBtn.onclick = function(e) {
-                e.stopPropagation();
-                isWishlistMode = !isWishlistMode;
-                updateWishlistButtonCount();
-
-                if (isWishlistMode) {
-                    document.getElementById('search-keyword').value = '';
-                    renderWishlist();
-                } else {
-                    renderStores(currentStores, new kakao.maps.LatLng(centerLat, centerLng));
-                }
-            };
-
-            function updateGuideText(addressName) {
-                const guideEl = document.getElementById('guide-text-msg');
-                
-                if (isWishlistMode) {
-                    guideEl.innerHTML = `❤️ <strong>찜한 음식점 목록</strong>을 조회 중입니다. (${wishlist.length}개)`;
-                    return;
-                }
-
-                if (addressName) {
-                    guideEl.innerHTML = `📍 <strong>중심 위치:</strong> ${addressName}<br>🚶 반경 <strong>500m (도보권)</strong> 내 음식점`;
-                } else {
-                    guideEl.innerHTML = `📍 현재 위치 기준 반경 <strong>500m (도보권)</strong> 내 음식점을 불러옵니다.`;
-                }
-            }
-
-            function searchDetailAddrFromCoords(coords, callback) {
-                geocoder.coord2Address(coords.getLng(), coords.getLat(), callback);
-            }
-
-            function getMapSearchUrl(platform, name, address) {
-                const query = encodeURIComponent(name + ' ' + address);
-                if (platform === 'naver') {
-                    return `https://map.naver.com/v5/search/${query}`;
-                } else if (platform === 'google') {
-                    return `https://www.google.com/maps/search/?api=1&query=${query}`;
-                } else {
-                    return `https://www.kakao.com/?q=${query}`;
-                }
-            }
-
-            function clearMarkers() {
-                currentMarkers.forEach(item => item.marker.setMap(null));
-                currentMarkers = [];
-                if (pinnedInfoWindow) {
-                    pinnedInfoWindow.close();
-                    pinnedInfoWindow = null;
-                }
-            }
-
-            function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
-                const R = 6371000;
-                const dLat = deg2rad(lat2 - lat1);
-                const dLon = deg2rad(lon2 - lon1);
-                const a = 
-                    Math.sin(dLat/2) * Math.sin(dLat/2) +
-                    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * 
-                    Math.sin(dLon/2) * Math.sin(dLon/2);
-                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
-                return Math.round(R * c);
-            }
-
-            function deg2rad(deg) { return deg * (Math.PI/180); }
-
-            function generateMockTel(storeId, address) {
-                if (address.includes('서울')) {
-                    const tail = String(Math.abs(hashCode(storeId || 'seoul')) % 9000 + 1000);
-                    return `02-${tail}-${tail}`;
-                } else if (address.includes('경기') || address.includes('인천')) {
-                    const tail = String(Math.abs(hashCode(storeId || 'gyeonggi')) % 9000 + 1000);
-                    return `031-${tail}-${tail}`;
-                } else {
-                    const tail = String(Math.abs(hashCode(storeId || 'store')) % 9000 + 1000);
-                    return `010-${tail}-${tail}`;
-                }
-            }
-
-            function hashCode(str) {
-                let hash = 0;
-                for (let i = 0; i < str.length; i++) {
-                    hash = ((hash << 5) - hash) + str.charCodeAt(i);
-                    hash |= 0;
-                }
-                return hash;
-            }
-
-            function getStoreRatingAndReviews(store) {
-                const hashVal = Math.abs(hashCode(store.bizesId || store.bizesNm || 'store'));
-                const rating = (4.0 + (hashVal % 11) * 0.1).toFixed(1);
-                const reviewCount = (hashVal % 85) + 8;
-                return { rating, reviewCount };
-            }
-
-            function getFoodCategory(indsName, indsLargeName, storeName) {
-                if (!indsName) indsName = '';
-                if (!indsLargeName) indsLargeName = '';
-                if (!storeName) storeName = '';
-
-                const text = (indsName + ' ' + indsLargeName + ' ' + storeName).toLowerCase();
-                const excludeKeywords = [
-                    '부동산', '중개', '미용', '헤어', '뷰티', '피부', '욕탕', '사우나', '찜질', 
-                    '세탁', '크리닝', 'pc방', '컴퓨터', '당구장', '오락', '약국', '병원', '의원', 
-                    '치과', '한의원', '학원', '교습', '교육', '문구', '서적', '주유소', '충전소', 
-                    '골프', '헬스', '운동', '스포츠', '정비', '카센터', '임대', '소모품', '안경',
-                    '의류', '패션', '신발', '가전', '핸드폰', '꽃집', '애완', '반려', '인테리어',
-                    '철물', '조명', '가구', '사진', '스튜디오', '공방', '인쇄', '기획', '세무',
-                    '회계', '법무', '노무', '신문', '종교', '교회', '사찰', '성당', '안마', '마사지',
-                    '창고', '중고', '재활용', '고물', '농협', '은행', '금융', '보험', '증권'
-                ];
-
-                for (const keyword of excludeKeywords) {
-                    if (text.includes(keyword)) return null;
-                }
-
-                const foodCheckKeywords = [
-                    '식당', '음식', '요리', '한식', '중식', '일식', '양식', '분식', '구이', '찌개',
-                    '국밥', '회', '초밥', '고기', '냉면', '백반', '면', '족발', '보쌈', '치킨',
-                    '호프', '주점', '카페', '커피', '제과', '빵', '패스트푸드', '피자', '햄버거',
-                    '순두부', '국수', '우동', '삼겹살', '곱창', '닭갈비', '뷔페', '포차', '막창',
-                    '갈비', '탕', '수육', '반찬', '도시락', '김밥', '토스트', '샌드위치', '맥주', '소주'
-                ];
-
-                let isFood = false;
-                for (const fk of foodCheckKeywords) {
-                    if (text.includes(fk)) {
-                        isFood = true;
-                        break;
-                    }
-                }
-
-                if (!isFood) return null;
-
-                if (text.includes('한식') || text.includes('순두부') || text.includes('국밥') || text.includes('고기') || text.includes('냉면') || text.includes('백반') || text.includes('육류') || text.includes('삼겹살') || text.includes('찌개') || text.includes('보쌈') || text.includes('족발') || text.includes('국수') || text.includes('갈비') || text.includes('탕')) return '한식';
-                if (text.includes('중식') || text.includes('짜장') || text.includes('중국요리') || text.includes('짬뽕')) return '중식';
-                if (text.includes('일식') || text.includes('초밥') || text.includes('회') || text.includes('돈가스') || text.includes('우동') || text.includes('참치') || text.includes('사시미')) return '일식/회';
-                if (text.includes('양식') || text.includes('패밀리') || text.includes('피자') || text.includes('햄버거') || text.includes('스테이크') || text.includes('파스타') || text.includes('이탈리아')) return '양식/패스트푸드';
-                if (text.includes('커피') || text.includes('카페') || text.includes('다방') || text.includes('음료') || text.includes('차') || text.includes('디저트') || text.includes('제과') || text.includes('빵') || text.includes('베이커리')) return '카페/디저트';
-                if (text.includes('분식') || text.includes('김밥') || text.includes('떡볶이') || text.includes('토스트') || text.includes('샌드위치')) return '분식';
-                if (text.includes('치킨') || text.includes('호프') || text.includes('주점') || text.includes('포차') || text.includes('맥주') || text.includes('소주') || text.includes('통닭') || text.includes('bar') || text.includes('바')) return '치킨/술집';
-                
-                return '기타 음식점';
-            }
-
-            function pinStoreOnMap(store, marker, infowindow) {
-                if (pinnedInfoWindow === infowindow) {
-                    infowindow.close();
-                    pinnedInfoWindow = null;
-                    if (store._cardElement) store._cardElement.classList.remove('selected');
-                    return;
-                }
-
-                if (pinnedInfoWindow) pinnedInfoWindow.close();
-                infowindow.open(map, marker);
-                pinnedInfoWindow = infowindow;
-
-                document.querySelectorAll('.store-card').forEach(c => c.classList.remove('selected'));
-                if (store._cardElement) {
-                    store._cardElement.classList.add('selected');
-                    store._cardElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                }
-            }
-
-            function renderStores(storesToRender, currentLatLng) {
-                const listContainer = document.getElementById('store-list-container');
-                listContainer.innerHTML = '';
-                clearMarkers();
-
-                if (!storesToRender || storesToRender.length === 0) {
-                    listContainer.innerHTML = '<p style="text-align: center; color: #888; margin-top: 30px;">검색 결과가 없습니다.</p>';
-                    return;
-                }
-
-                const selectedPlatform = document.getElementById('map-platform-select').value;
-                const groups = {};
-
-                storesToRender.forEach((store) => {
-                    const groupKey = getFoodCategory(store.indsSclsNm, store.indsLclsNm, store.bizesNm);
-                    if (!groupKey) return; 
-
-                    if (!groups[groupKey]) groups[groupKey] = [];
-                    groups[groupKey].push(store);
-
-                    const storeLat = store.lat;
-                    const storeLon = store.lon;
-                    const name = store.bizesNm || '상호명 없음';
-                    const address = store.rdnmAdr || store.lnoAdr || '주소 정보 없음';
-                    const tel = (store.telno && store.telno.trim() !== '') ? store.telno : generateMockTel(store.bizesId, address);
-                    const category = store.indsSclsNm || '음식점';
-
-                    const distanceMeters = getDistanceFromLatLonInMeters(centerLat, centerLng, storeLat, storeLon);
-                    store.distanceMeters = distanceMeters;
-                    
-                    const { rating, reviewCount } = getStoreRatingAndReviews(store);
-                    store.rating = parseFloat(rating);
-                    store.reviewCount = reviewCount;
-
-                    if (storeLat && storeLon) {
-                        const markerPosition = new kakao.maps.LatLng(storeLat, storeLon);
-                        const marker = new kakao.maps.Marker({ position: markerPosition });
-                        marker.setMap(map);
-
-                        const mapUrl = getMapSearchUrl(selectedPlatform, name, address);
-                        const isW = isWished(store);
-                        const wishIcon = isW ? '❤️' : '🤍';
-                        
-                        const infowindowContent = `
-                            <div style="padding:10px; font-size:12px; width:220px; line-height:1.4; background:#1e1e1e; color:#fff; border-radius:8px;">
-                                <div style="font-weight:bold; font-size:14px; margin-bottom:4px; color:#fff;">${name}</div>
-                                <div>⭐ ${rating} (${reviewCount}) · 🟢 영업 중</div>
-                                <div style="color:#aaa; margin-top:4px;">${address}</div>
-                                <div style="margin-top:8px; display:flex; justify-content:space-between;">
-                                    <a href="${mapUrl}" target="_blank" style="color:#60a5fa; text-decoration:none;">지도 앱에서 보기 ↗</a>
-                                    <button onclick="window.toggleWishFromWindow('${getStoreKey(store)}')" style="background:#333; color:#fff; border:none; padding:2px 6px; border-radius:4px; cursor:pointer;">${wishIcon} 찜</button>
-                                </div>
-                            </div>
-                        `;
-
-                        const infowindow = new kakao.maps.InfoWindow({
-                            content: infowindowContent,
-                            removable: true
-                        });
-
-                        kakao.maps.event.addListener(marker, 'mouseover', function() {
-                            if (pinnedInfoWindow !== infowindow) infowindow.open(map, marker);
-                        });
-
-                        kakao.maps.event.addListener(marker, 'mouseout', function() {
-                            if (pinnedInfoWindow !== infowindow) infowindow.close();
-                        });
-
-                        kakao.maps.event.addListener(marker, 'click', function() {
-                            pinStoreOnMap(store, marker, infowindow);
-                        });
-
-                        currentMarkers.push({ marker, infowindow, store });
-                    }
-                });
-
-                let totalCount = 0;
-                for (const [groupName, storeList] of Object.entries(groups)) {
-                    totalCount += storeList.length;
-                    const section = document.createElement('div');
-                    section.className = 'group-section';
-
-                    const titleDiv = document.createElement('div');
-                    titleDiv.className = 'group-title';
-                    titleDiv.innerHTML = `
-                        <span>🍴 ${groupName}</span>
-                        <div class="group-count-wrap">
-                            <span class="group-count">${storeList.length}개</span>
-                            <span class="toggle-icon" style="transform: ${isAllCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)'};">▼</span>
-                        </div>
-                    `;
-
-                    const contentDiv = document.createElement('div');
-                    contentDiv.className = 'group-content' + (isAllCollapsed ? ' collapsed' : '');
-
-                    titleDiv.onclick = function(e) {
-                        e.stopPropagation();
-                        const isCollapsed = contentDiv.classList.toggle('collapsed');
-                        const icon = titleDiv.querySelector('.toggle-icon');
-                        icon.style.transform = isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
-                    };
-
-                    section.appendChild(titleDiv);
-                    section.appendChild(contentDiv);
-
-                    storeList.sort((a, b) => {
-                        if (b.rating !== a.rating) return b.rating - a.rating;
-                        if (b.reviewCount !== a.reviewCount) return b.reviewCount - a.reviewCount;
-                        return a.distanceMeters - b.distanceMeters;
-                    });
-
-                    storeList.forEach((store) => {
-                        const name = store.bizesNm || '상호명 없음';
-                        const category = store.indsSclsNm || '음식점';
-                        const address = store.rdnmAdr || store.lnoAdr || '주소 정보 없음';
-                        const tel = (store.telno && store.telno.trim() !== '') ? store.telno : generateMockTel(store.bizesId, address);
-                        const mapUrl = getMapSearchUrl(selectedPlatform, name, address);
-                        const isW = isWished(store);
-
-                        const card = document.createElement('div');
-                        card.className = 'store-card';
-                        store._cardElement = card; 
-
-                        card.innerHTML = `
-                            <div class="native-card-header">
-                                <div class="store-name">
-                                    <span>${name}</span>
-                                </div>
-                                <button class="wish-btn" title="찜하기">${isW ? '❤️' : '🤍'}</button>
-                            </div>
-                            <div class="store-sub-info">
-                                <span class="rating-badge">★ ${store.rating}</span>
-                                <span class="review-count">(${store.reviewCount})</span>
-                                <span>·</span>
-                                <span>${category}</span>
-                                <span>·</span>
-                                <span>₩1만~3만</span>
-                            </div>
-                            <div class="store-status-row">
-                                <span class="status-open">🟢 영업 중</span>
-                                <span style="color: #888;">· 21:00에 영업 종료</span>
-                            </div>
-                            <div class="store-sub-info">📍 ${address} (${store.distanceMeters}m)</div>
-
-                            <div class="native-action-bar">
-                                <a href="${mapUrl}" target="_blank" onclick="event.stopPropagation();" class="native-action-btn">🧭 경로</a>
-                                <a href="${mapUrl}" target="_blank" onclick="event.stopPropagation();" class="native-action-btn">🚗 시작</a>
-                                <a href="tel:${tel}" onclick="event.stopPropagation();" class="native-action-btn">📞 통화</a>
-                                <button onclick="event.stopPropagation(); alert('링크가 복사되었습니다!');" class="native-action-btn">🔗 공유</button>
-                            </div>
-                        `;
-
-                        const wishBtn = card.querySelector('.wish-btn');
-                        wishBtn.onclick = function(e) {
-                            toggleWish(store, e);
-                        };
-
-                        card.onmouseenter = function() {
-                            const found = currentMarkers.find(m => m.store === store);
-                            if (found && pinnedInfoWindow !== found.infowindow) found.infowindow.open(map, found.marker);
-                        };
-
-                        card.onmouseleave = function() {
-                            const found = currentMarkers.find(m => m.store === store);
-                            if (found && pinnedInfoWindow !== found.infowindow) found.infowindow.close();
-                        };
-
-                        card.onclick = function(e) {
-                            e.stopPropagation();
-                            const found = currentMarkers.find(m => m.store === store);
-                            if (found) pinStoreOnMap(store, found.marker, found.infowindow);
-                        };
-
-                        contentDiv.appendChild(card);
-                    });
-
-                    listContainer.appendChild(section);
-                }
-
-                if (totalCount === 0) {
-                    listContainer.innerHTML = '<p style="text-align: center; color: #888; margin-top: 30px;">반경 500m 내 음식점이 없습니다.</p>';
-                }
-            }
-
-            window.toggleWishFromWindow = function(storeKey) {
-                const foundStore = currentStores.find(s => getStoreKey(s) === storeKey);
-                if (foundStore) {
-                    toggleWish(foundStore);
-                } else {
-                    const index = wishlist.indexOf(storeKey);
-                    if (index > -1) wishlist.splice(index, 1);
-                    else wishlist.push(storeKey);
-                    localStorage.setItem('my_store_wishlist', JSON.stringify(wishlist));
-                    updateWishlistButtonCount();
-                    renderWishlist();
-                }
-            };
-
-            function renderWishlist() {
-                const listContainer = document.getElementById('store-list-container');
-                listContainer.innerHTML = '';
-                clearMarkers();
-                updateGuideText(null);
-
-                if (wishlist.length === 0) {
-                    listContainer.innerHTML = '<p style="text-align: center; color: #888; margin-top: 50px;">찜한 음식점이 없습니다. 마음에 드는 식당에 하트를 눌러보세요!</p>';
-                    return;
-                }
-
-                const wishedStores = [];
-                wishlist.forEach(key => {
-                    let matched = currentStores.find(s => getStoreKey(s) === key);
-                    if (!matched) {
-                        matched = {
-                            bizesId: key,
-                            bizesNm: key.split('_')[0] || '찜한 음식점',
-                            rdnmAdr: key.split('_')[1] || '주소 정보 없음',
-                            lat: centerLat,
-                            lon: centerLng,
-                            distanceMeters: 0
-                        };
-                    }
-                    wishedStores.push(matched);
-                });
-
-                const selectedPlatform = document.getElementById('map-platform-select').value;
-                const contentDiv = document.createElement('div');
-                contentDiv.className = 'group-content';
-
-                wishedStores.forEach((store) => {
-                    const name = store.bizesNm || '상호명 없음';
-                    const address = store.rdnmAdr || store.lnoAdr || '주소 정보 없음';
-                    const tel = (store.telno && store.telno.trim() !== '') ? store.telno : generateMockTel(store.bizesId, address);
-                    const category = store.indsSclsNm || '즐겨찾기 맛집';
-                    const mapUrl = getMapSearchUrl(selectedPlatform, name, address);
-                    const { rating, reviewCount } = getStoreRatingAndReviews(store);
-
-                    if (store.lat && store.lon) {
-                        const markerPosition = new kakao.maps.LatLng(store.lat, store.lon);
-                        const marker = new kakao.maps.Marker({ position: markerPosition });
-                        marker.setMap(map);
-
-                        const infowindow = new kakao.maps.InfoWindow({
-                            content: `<div style="padding:10px; font-size:12px; width:200px; background:#1e1e1e; color:#fff;"><strong>${name}</strong><br><a href="${mapUrl}" target="_blank" style="color:#60a5fa;">상세보기 ↗</a></div>`,
-                            removable: true
-                        });
-
-                        kakao.maps.event.addListener(marker, 'click', function() {
-                            pinStoreOnMap(store, marker, infowindow);
-                        });
-
-                        currentMarkers.push({ marker, infowindow, store });
-                    }
-
-                    const card = document.createElement('div');
-                    card.className = 'store-card';
-                    store._cardElement = card;
-
-                    card.innerHTML = `
-                        <div class="native-card-header">
-                            <div class="store-name"><span>${name}</span></div>
-                            <button class="wish-btn" title="찜 해제">❤️</button>
-                        </div>
-                        <div class="store-sub-info">
-                            <span class="rating-badge">★ ${rating}</span>
-                            <span class="review-count">(${reviewCount})</span>
-                            <span>·</span>
-                            <span>${category}</span>
-                        </div>
-                        <div class="store-sub-info">📍 ${address}</div>
-                        
-                        <div class="native-action-bar">
-                            <a href="${mapUrl}" target="_blank" onclick="event.stopPropagation();" class="native-action-btn">🧭 경로</a>
-                            <a href="${mapUrl}" target="_blank" onclick="event.stopPropagation();" class="native-action-btn">🚗 시작</a>
-                            <a href="tel:${tel}" onclick="event.stopPropagation();" class="native-action-btn">📞 통화</a>
-                            <button onclick="event.stopPropagation(); alert('링크가 복사되었습니다!');" class="native-action-btn">🔗 공유</button>
-                        </div>
-                    `;
-
-                    const wishBtn = card.querySelector('.wish-btn');
-                    wishBtn.onclick = function(e) {
-                        toggleWish(store, e);
-                    };
-
-                    card.onclick = function(e) {
-                        e.stopPropagation();
-                        const found = currentMarkers.find(m => m.store === store);
-                        if (found) pinStoreOnMap(store, found.marker, found.infowindow);
-                    };
-
-                    contentDiv.appendChild(card);
-                });
-
-                const section = document.createElement('div');
-                section.className = 'group-section';
-                section.innerHTML = `<div class="group-title" style="cursor:default;"><span>❤️ 찜한 맛집 모음</span><span class="group-count">${wishedStores.length}개</span></div>`;
-                section.appendChild(contentDiv);
-                listContainer.appendChild(section);
-            }
-
-            let loadTimer = null;
-            function loadStoresDebounced(lat, lng) {
-                if (isWishlistMode) return;
-                if (loadTimer) clearTimeout(loadTimer);
-                
-                document.getElementById('store-list-container').innerHTML = '<p style="text-align: center; color: #888; margin-top: 30px;">데이터를 불러오는 중...</p>';
-                
-                loadTimer = setTimeout(async () => {
-                    try {
-                        const response = await fetch(`/api/stores/radius?cx=${lng}&cy=${lat}&radius=${fixedRadius}&numOfRows=300`);
-                        const data = await response.json();
-
-                        let items = [];
-                        if (data?.body?.items) items = data.body.items;
-                        else if (data?.response?.body?.items?.item) items = data.response.body.items.item;
-                        else if (Array.isArray(data)) items = data;
-
-                        if (!Array.isArray(items)) items = items ? [items] : [];
-
-                        currentStores = items.filter(store => getFoodCategory(store.indsSclsNm, store.indsLclsNm, store.bizesNm) !== null);
-
-                        document.getElementById('search-keyword').value = '';
-                        renderStores(currentStores, new kakao.maps.LatLng(lat, lng));
-
-                    } catch (error) {
-                        console.error('데이터 로드 실패:', error);
-                        document.getElementById('store-list-container').innerHTML = '<p style="color:red; text-align:center;">데이터를 불러오지 못했습니다.</p>';
-                    }
-                }, 300);
-            }
-
-            function filterStores() {
-                if (isWishlistMode) return;
-                const rawKeyword = document.getElementById('search-keyword').value;
-                const keyword = rawKeyword.replace(/\s+/g, '').toLowerCase();
-
-                if (!keyword) {
-                    renderStores(currentStores, new kakao.maps.LatLng(centerLat, centerLng));
-                    return;
-                }
-
-                const filtered = currentStores.filter(store => {
-                    const name = (store.bizesNm || '').replace(/\s+/g, '').toLowerCase();
-                    const category = (store.indsSclsNm || '').replace(/\s+/g, '').toLowerCase();
-                    
-                    let altKeyword = keyword;
-                    if (keyword === '엘에이') altKeyword = 'la';
-                    else if (keyword === 'la') altKeyword = '엘에이';
-
-                    return name.includes(keyword) || name.includes(altKeyword) || category.includes(keyword);
-                });
-
-                renderStores(filtered, new kakao.maps.LatLng(centerLat, centerLng));
-            }
-
-            document.getElementById('search-btn').onclick = filterStores;
-            document.getElementById('search-keyword').onkeyup = function(event) {
-                (event.key === 'Enter') && filterStores();
-            };
-
-            document.getElementById('map-platform-select').onchange = function() {
-                if (isWishlistMode) renderWishlist();
-                else filterStores();
-            };
-
-            function updateCenterMarker(latlng) {
-                if (centerMarker) centerMarker.setMap(null);
-                if (centerCircle) centerCircle.setMap(null);
-                if (centerInfoWindow) centerInfoWindow.close();
-
-                const imageSrc = 'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_red.png';
-                const imageSize = new kakao.maps.Size(40, 42);
-                const imageOption = { offset: new kakao.maps.Point(13, 37) };
-                const markerImage = new kakao.maps.MarkerImage(imageSrc, imageSize, imageOption);
-
-                centerMarker = new kakao.maps.Marker({
-                    position: latlng,
-                    image: markerImage
-                });
-                centerMarker.setMap(map);
-
-                centerCircle = new kakao.maps.Circle({
-                    center: latlng,
-                    radius: fixedRadius,
-                    strokeWeight: 2,
-                    strokeColor: '#3b82f6',
-                    strokeOpacity: 0.8,
-                    fillColor: '#3b82f6',
-                    fillOpacity: 0.15
-                });
-                centerCircle.setMap(map);
-
-                updateGuideText(null);
-
-                searchDetailAddrFromCoords(latlng, function(result, status) {
-                    if (status === kakao.maps.services.Status.OK) {
-                        let detailAddr = result[0].road_address ? result[0].road_address.address_name : '';
-                        let jibunAddr = result[0].address ? result[0].address.address_name : '';
-                        let fullAddress = detailAddr || jibunAddr || '주소 정보 없음';
-
-                        updateGuideText(fullAddress);
-
-                        centerInfoWindow = new kakao.maps.InfoWindow({
-                            content: `<div style="padding:8px 12px; font-size:12px; font-weight:bold; color:#f87171; background:#1e1e1e;">📍 선택된 중심 위치 (반경 500m)<br><span style="font-weight:normal; color:#fff;">${fullAddress}</span></div>`,
-                            removable: true
-                        });
-
-                        kakao.maps.event.addListener(centerMarker, 'click', function() {
-                            centerInfoWindow.open(map, centerMarker);
-                        });
-                    }
-                });
-            }
-
-            document.getElementById('current-location-btn').onclick = function(e) {
-                e.stopPropagation();
-                if (!navigator.geolocation) {
-                    alert('이 브라우저는 위치 정보를 지원하지 않습니다.');
-                    return;
-                }
-
-                if (isWishlistMode) {
-                    isWishlistMode = false;
-                    updateWishlistButtonCount();
-                }
-
-                document.getElementById('store-list-container').innerHTML = '<p style="text-align: center; color: #888; margin-top: 50px;">현재 위치를 가져오는 중...</p>';
-
-                navigator.geolocation.getCurrentPosition(
-                    function(position) {
-                        centerLat = position.coords.latitude;
-                        centerLng = position.coords.longitude;
-
-                        const currentLatLng = new kakao.maps.LatLng(centerLat, centerLng);
-                        map.setCenter(currentLatLng);
-                        updateCenterMarker(currentLatLng);
-                        loadStoresDebounced(centerLat, centerLng);
-                    },
-                    function(error) {
-                        alert('현재 위치를 가져오지 못했습니다. 위치 권한을 확인해주세요.');
-                        console.warn(error);
-                    },
-                    { timeout: 10000, maximumAge: 0 }
-                );
-            };
-
-            kakao.maps.event.addListener(map, 'click', function(mouseEvent) {
-                if (window.innerWidth <= 768) {
-                    setSidebarHeight(getHeights().peek);
-                }
-
-                if (pinnedInfoWindow) {
-                    pinnedInfoWindow.close();
-                    pinnedInfoWindow = null;
-                }
-                document.querySelectorAll('.store-card').forEach(c => c.classList.remove('selected'));
-
-                const latlng = mouseEvent.latLng;
-                centerLat = latlng.getLat();
-                centerLng = latlng.getLng();
-
-                if (isWishlistMode) {
-                    isWishlistMode = false;
-                    updateWishlistButtonCount();
-                }
-
-                updateCenterMarker(latlng);
-                loadStoresDebounced(centerLat, centerLng);
-            });
-
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                    function(position) {
-                        centerLat = position.coords.latitude;
-                        centerLng = position.coords.longitude;
-
-                        const currentLatLng = new kakao.maps.LatLng(centerLat, centerLng);
-                        map.setCenter(currentLatLng);
-                        updateCenterMarker(currentLatLng);
-                        loadStoresDebounced(centerLat, centerLng);
-                    },
-                    function(error) {
-                        console.warn('현재 위치를 가져올 수 없어 기본 위치(서울시청)로 대체합니다.', error);
-                        const defaultLatLng = new kakao.maps.LatLng(centerLat, centerLng);
-                        updateCenterMarker(defaultLatLng);
-                        loadStoresDebounced(centerLat, centerLng);
-                    },
-                    { timeout: 10000, maximumAge: 0 }
-                );
+    <table>
+        <thead>
+            <tr>
+                <th>상호명</th>
+                <th>표준산업분류코드 (KSIC)</th>
+                <th>주소</th>
+                <th>상태</th>
+            </tr>
+        </thead>
+        <tbody id="resultTableBody">
+            <tr>
+                <td colspan="4" style="text-align: center; color: #7f8c8d;">'데이터 정제 실행' 버튼을 눌러주세요.</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<script>
+    // 시뮬레이션을 위한 샘플 원천 데이터 (건축사사무소 등 비음식점 오입력 데이터 포함)
+    const rawApiData = [
+        { bizesNm: "광명대창집 자곡점", ksicCd: "I56111", rdnmAdr: "서울특별시 강남구 자곡로 123" },
+        { bizesNm: "시명종합건축사사무소", ksicCd: "M72110", rdnmAdr: "서울특별시 강남구 자곡로 45" },
+        { bizesNm: "스타벅스 자곡사거리점", ksicCd: "I56220", rdnmAdr: "서울특별시 강남구 자곡로 78" },
+        { bizesNm: "한국엔지니어링컨설팅", ksicCd: "M72120", rdnmAdr: "서울특별시 강남구 자곡로 99" },
+        { bizesNm: "자곡본가한식당", ksicCd: "I56112", rdnmAdr: "서울특별시 강남구 자곡로 11" }
+    ];
+
+    function runFilteringProcess() {
+        const ALLOWED_INDUSTRY_PREFIX = "I56";
+        const EXCLUDE_KEYWORDS = ["건축사", "사무소", "엔지니어링", "부동산", "법무", "세무", "컨설팅", "연구소"];
+
+        const validRestaurants = [];
+        const droppedItems = [];
+
+        rawApiData.forEach(item => {
+            const ksicCode = String(item.ksicCd || "").trim();
+            const bizName = String(item.bizesNm || "").trim();
+
+            const isFoodIndustry = ksicCode.startsWith(ALLOWED_INDUSTRY_PREFIX);
+            const hasExcludedKeyword = EXCLUDE_KEYWORDS.some(keyword => bizName.includes(keyword));
+
+            if (isFoodIndustry && !hasExcludedKeyword) {
+                validRestaurants.push({ ...item, status: 'valid' });
             } else {
-                const defaultLatLng = new kakao.maps.LatLng(centerLat, centerLng);
-                updateCenterMarker(defaultLatLng);
-                loadStoresDebounced(centerLat, centerLng);
+                droppedItems.push({ ...item, status: 'dropped' });
             }
-        };
-    </script>
+        });
+
+        // 통계 업데이트
+        document.getElementById('totalCount').innerText = `전체 원본: ${rawApiData.length}건`;
+        document.getElementById('validCount').innerText = `정상 음식점: ${validRestaurants.length}건`;
+        document.getElementById('droppedCount').innerText = `차단된 비음식점: ${droppedItems.length}건`;
+
+        // 테이블 렌더링
+        const tbody = document.getElementById('resultTableBody');
+        tbody.innerHTML = '';
+
+        const combinedResults = [...validRestaurants, ...droppedItems];
+        combinedResults.forEach(item => {
+            const tr = document.createElement('tr');
+            
+            const badgeClass = item.status === 'valid' ? 'badge-food' : 'badge-dropped';
+            const badgeText = item.status === 'valid' ? '정상 승인' : '원천 차단';
+
+            tr.innerHTML = `
+                <td><strong>${item.bizesNm}</strong></td>
+                <td>${item.ksicCd}</td>
+                <td>${item.rdnmAdr}</td>
+                <td><span class="badge ${badgeClass}">${badgeText}</span></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+</script>
+
 </body>
 </html>
