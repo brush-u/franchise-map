@@ -121,7 +121,7 @@
 
             window.addEventListener('touchmove', (e) => {
                 if (!isDragging) return;
-                const deltaY = startY - e.touches[0].clientY; // 위로 올리면 커지고, 아래로 내리면 작아짐
+                const deltaY = startY - e.touches[0].clientY;
                 let newHeight = startHeight + deltaY;
                 const maxHeight = window.innerHeight * 0.9;
                 const minHeight = window.innerHeight * 0.12;
@@ -136,7 +136,6 @@
                 isDragging = false;
             });
 
-            // 마우스 드래그 지원 (PC 화면에서 모바일 크기로 테스트할 때 유용)
             dragHandle.addEventListener('mousedown', (e) => {
                 isDragging = true;
                 startY = e.clientY;
@@ -161,7 +160,6 @@
                 isDragging = false;
             });
 
-            // 기존 지도 및 데이터 로직
             const statusMsg = document.getElementById('status-msg');
 
             if (typeof kakao === 'undefined' || !kakao.maps) {
@@ -561,8 +559,8 @@
 
                 const imageSrc = 'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_red.png';
                 const imageSize = new kakao.maps.Size(35, 35);
-                const imageOption = { offset: new kakalo = new kakao.maps.Point(13, 35) };
-                const markerImage = new kakao.maps.MarkerImage(imageSrc, imageSize, { offset: new kakao.maps.Point(13, 35) });
+                const imageOption = { offset: new kakao.maps.Point(13, 35) };
+                const markerImage = new kakao.maps.MarkerImage(imageSrc, imageSize, imageOption);
 
                 centerMarker = new kakao.maps.Marker({
                     position: latlng,
