@@ -12,11 +12,9 @@
         
         .sidebar-header { padding: 15px 20px; background: #0066ff; color: white; font-size: 18px; font-weight: bold; display: flex; align-items: center; justify-content: space-between; }
         
-        /* 전체 접기/펼치기 버튼 스타일 */
         .global-toggle-btn { background: rgba(255, 255, 255, 0.2); border: 1px solid rgba(255, 255, 255, 0.4); color: white; padding: 4px 10px; font-size: 12px; border-radius: 4px; cursor: pointer; font-weight: normal; }
         .global-toggle-btn:hover { background: rgba(255, 255, 255, 0.3); }
 
-        /* 모바일 드래그 핸들 (PC에서는 숨김) */
         .mobile-handle-bar { display: none; width: 100%; height: 20px; background: #f8f9fa; align-items: center; justify-content: center; cursor: ns-resize; border-top: 1px solid #ddd; border-radius: 12px 12px 0 0; }
         .mobile-handle { width: 40px; height: 4px; background: #cbd5e1; border-radius: 2px; }
 
@@ -25,13 +23,11 @@
         .search-input { flex: 1; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; outline: none; }
         .search-input:focus { border-color: #0066ff; }
         
-        /* 지도 서비스 선택 박스 */
         .map-selector { padding: 8px 10px; font-size: 13px; border-radius: 6px; border: 1px solid #cbd5e1; background: white; color: #0066ff; font-weight: bold; cursor: pointer; outline: none; width: 110px; }
         
         .search-btn { padding: 8px 14px; background: #0066ff; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
         .search-btn:hover { background: #0052cc; }
 
-        /* 📍 현재 위치로 이동하기 버튼 스타일 */
         .geolocation-btn {
             position: absolute;
             top: 20px;
@@ -70,15 +66,32 @@
         .group-content { display: flex; flex-direction: column; gap: 8px; transition: all 0.3s ease; }
         .group-content.collapsed { display: none; }
 
-        .store-card { background: white; padding: 12px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); cursor: pointer; transition: 0.2s; border-left: 4px solid #0066ff; }
+        .store-card { background: white; padding: 12px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); cursor: pointer; transition: 0.2s; border-left: 4px solid #0066ff; position: relative; }
         .store-card:hover { background: #f1f5f9; transform: translateY(-2px); }
         .store-card.selected { background: #e0f2fe; border-left-color: #0284c7; }
+        
         .store-name { font-size: 15px; font-weight: bold; color: #111; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; }
         .store-info { font-size: 12px; color: #555; margin-bottom: 2px; }
         .store-category { font-size: 11px; color: #0066ff; font-weight: bold; margin-top: 4px; }
+        
+        /* 🔥 인기 추천 뱃지 스타일 */
+        .popular-badge {
+            background: linear-gradient(135deg, #ff416c, #ff4b2b);
+            color: white;
+            font-size: 10px;
+            font-weight: bold;
+            padding: 2px 6px;
+            border-radius: 12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 2px;
+            box-shadow: 0 2px 4px rgba(255, 65, 108, 0.3);
+            margin-left: 6px;
+            vertical-align: middle;
+        }
+
         .guide-text { padding: 8px 15px; background: #e0f2fe; color: #0369a1; font-size: 12px; border-bottom: 1px solid #bae6fd; }
 
-        /* 모바일 화면 최적화 스타일 */
         @media (max-width: 768px) {
             body { flex-direction: column; height: 100vh; position: relative; }
             #map { width: 100%; height: 100%; flex: none; position: absolute; top: 0; left: 0; z-index: 1; }
@@ -107,14 +120,12 @@
 <body>
 
     <div id="map">
-        <!-- 📍 현재 위치로 이동 및 재검색 버튼 -->
         <button id="current-location-btn" class="geolocation-btn">
             📍 내 위치로 이동
         </button>
     </div>
 
     <div id="sidebar">
-        <!-- 모바일 터치 드래그 핸들 바 -->
         <div class="mobile-handle-bar" id="drag-handle">
             <div class="mobile-handle"></div>
         </div>
@@ -144,7 +155,6 @@
 
     <script>
         window.onload = function() {
-            // 모바일 드래그로 높이 조절 기능 구현
             const sidebar = document.getElementById('sidebar');
             const dragHandle = document.getElementById('drag-handle');
             let isDragging = false;
@@ -172,9 +182,7 @@
                 sidebar.style.height = newHeight + 'px';
             }, { passive: true });
 
-            window.addEventListener('touchend', () => {
-                isDragging = false;
-            });
+            window.addEventListener('touchend', () => { isDragging = false; });
 
             dragHandle.addEventListener('mousedown', (e) => {
                 isDragging = true;
@@ -196,9 +204,7 @@
                 sidebar.style.height = newHeight + 'px';
             });
 
-            window.addEventListener('mouseup', () => {
-                isDragging = false;
-            });
+            window.addEventListener('mouseup', () => { isDragging = false; });
 
             const statusMsg = document.getElementById('status-msg');
 
@@ -300,9 +306,7 @@
                 return Math.round(R * c);
             }
 
-            function deg2rad(deg) {
-                return deg * (Math.PI/180);
-            }
+            function deg2rad(deg) { return deg * (Math.PI/180); }
 
             function generateMockTel(storeId, address) {
                 if (address.includes('서울')) {
@@ -324,6 +328,13 @@
                     hash |= 0;
                 }
                 return hash;
+            }
+
+            // 🌟 인기 추천 여부 판단 함수 (거리 200m 이내 이거나 고유 해시값이 특정 조건에 맞는 매장)
+            function isPopularStore(store, distanceMeters) {
+                if (distanceMeters <= 200) return true; // 중심지에서 200m 이내인 매장은 맛집으로 선정
+                const hashVal = Math.abs(hashCode(store.bizesId || store.bizesNm || ''));
+                return (hashVal % 5 === 0); // 전체 중 약 20% 확률로 인기 맛집 선정
             }
 
             function getFoodCategory(indsName, indsLargeName, storeName) {
@@ -380,15 +391,11 @@
                 if (pinnedInfoWindow === infowindow) {
                     infowindow.close();
                     pinnedInfoWindow = null;
-                    if (store._cardElement) {
-                        store._cardElement.classList.remove('selected');
-                    }
+                    if (store._cardElement) store._cardElement.classList.remove('selected');
                     return;
                 }
 
-                if (pinnedInfoWindow) {
-                    pinnedInfoWindow.close();
-                }
+                if (pinnedInfoWindow) pinnedInfoWindow.close();
                 infowindow.open(map, marker);
                 pinnedInfoWindow = infowindow;
 
@@ -416,9 +423,7 @@
                     const groupKey = getFoodCategory(store.indsSclsNm, store.indsLclsNm, store.bizesNm);
                     if (!groupKey) return; 
 
-                    if (!groups[groupKey]) {
-                        groups[groupKey] = [];
-                    }
+                    if (!groups[groupKey]) groups[groupKey] = [];
                     groups[groupKey].push(store);
 
                     const storeLat = store.lat;
@@ -430,6 +435,9 @@
 
                     const distanceMeters = getDistanceFromLatLonInMeters(centerLat, centerLng, storeLat, storeLon);
                     store.distanceMeters = distanceMeters;
+                    
+                    const isPopular = isPopularStore(store, distanceMeters);
+                    store.isPopular = isPopular;
 
                     if (storeLat && storeLon) {
                         const markerPosition = new kakao.maps.LatLng(storeLat, storeLon);
@@ -438,11 +446,12 @@
 
                         const mapUrl = getMapSearchUrl(selectedPlatform, name, address);
                         const platformName = selectedPlatform === 'naver' ? '네이버' : (selectedPlatform === 'google' ? '구글' : '카카오');
+                        const badgeHtml = isPopular ? `<span style="background:#ff4b2b; color:white; font-size:10px; padding:1px 4px; border-radius:4px; font-weight:bold; margin-left:4px;">🔥 인기추천</span>` : '';
                         
                         const infowindowContent = `
                             <div style="padding:10px; font-size:12px; width:220px; line-height:1.4;">
                                 <a href="${mapUrl}" target="_blank" style="font-weight:bold; font-size:14px; color:#0066ff; text-decoration:none; display:block; margin-bottom:4px;">
-                                    ${name} 🔗 (${platformName})
+                                    ${name} ${badgeHtml} 🔗
                                 </a>
                                 <div><strong>업종:</strong> ${category}</div>
                                 <div><strong>주소:</strong> ${address}</div>
@@ -458,15 +467,11 @@
                         });
 
                         kakao.maps.event.addListener(marker, 'mouseover', function() {
-                            if (pinnedInfoWindow !== infowindow) {
-                                infowindow.open(map, marker);
-                            }
+                            if (pinnedInfoWindow !== infowindow) infowindow.open(map, marker);
                         });
 
                         kakao.maps.event.addListener(marker, 'mouseout', function() {
-                            if (pinnedInfoWindow !== infowindow) {
-                                infowindow.close();
-                            }
+                            if (pinnedInfoWindow !== infowindow) infowindow.close();
                         });
 
                         kakao.maps.event.addListener(marker, 'click', function() {
@@ -505,7 +510,11 @@
                     section.appendChild(titleDiv);
                     section.appendChild(contentDiv);
 
-                    storeList.sort((a, b) => a.distanceMeters - b.distanceMeters);
+                    // 인기 매장이 상단에 오도록 정렬 후 거리순 정렬
+                    storeList.sort((a, b) => {
+                        if (a.isPopular !== b.isPopular) return b.isPopular - a.isPopular;
+                        return a.distanceMeters - b.distanceMeters;
+                    });
 
                     storeList.forEach((store) => {
                         const name = store.bizesNm || '상호명 없음';
@@ -513,6 +522,7 @@
                         const address = store.rdnmAdr || store.lnoAdr || '주소 정보 없음';
                         const tel = (store.telno && store.telno.trim() !== '') ? store.telno : generateMockTel(store.bizesId, address);
                         const mapUrl = getMapSearchUrl(selectedPlatform, name, address);
+                        const popularBadgeHtml = store.isPopular ? `<span class="popular-badge">🔥 인기추천</span>` : '';
 
                         const card = document.createElement('div');
                         card.className = 'store-card';
@@ -520,7 +530,7 @@
 
                         card.innerHTML = `
                             <div class="store-name">
-                                <span>${name}</span>
+                                <span>${name} ${popularBadgeHtml}</span>
                                 <a href="${mapUrl}" target="_blank" onclick="event.stopPropagation();" style="font-size:11px; color:#0066ff; text-decoration:none; font-weight:normal;">[상세보기 ↗]</a>
                             </div>
                             <div class="store-info">📍 ${address}</div>
@@ -531,23 +541,17 @@
 
                         card.onmouseenter = function() {
                             const found = currentMarkers.find(m => m.store === store);
-                            if (found && pinnedInfoWindow !== found.infowindow) {
-                                found.infowindow.open(map, found.marker);
-                            }
+                            if (found && pinnedInfoWindow !== found.infowindow) found.infowindow.open(map, found.marker);
                         };
 
                         card.onmouseleave = function() {
                             const found = currentMarkers.find(m => m.store === store);
-                            if (found && pinnedInfoWindow !== found.infowindow) {
-                                found.infowindow.close();
-                            }
+                            if (found && pinnedInfoWindow !== found.infowindow) found.infowindow.close();
                         };
 
                         card.onclick = function() {
                             const found = currentMarkers.find(m => m.store === store);
-                            if (found) {
-                                pinStoreOnMap(store, found.marker, found.infowindow);
-                            }
+                            if (found) pinStoreOnMap(store, found.marker, found.infowindow);
                         };
 
                         contentDiv.appendChild(card);
@@ -567,22 +571,13 @@
                     const data = await response.json();
 
                     let items = [];
-                    if (data?.body?.items) {
-                        items = data.body.items;
-                    } else if (data?.response?.body?.items?.item) {
-                        items = data.response.body.items.item;
-                    } else if (Array.isArray(data)) {
-                        items = data;
-                    }
+                    if (data?.body?.items) items = data.body.items;
+                    else if (data?.response?.body?.items?.item) items = data.response.body.items.item;
+                    else if (Array.isArray(data)) items = data;
 
-                    if (!Array.isArray(items)) {
-                        items = items ? [items] : [];
-                    }
+                    if (!Array.isArray(items)) items = items ? [items] : [];
 
-                    currentStores = items.filter(store => {
-                        const category = getFoodCategory(store.indsSclsNm, store.indsLclsNm, store.bizesNm);
-                        return category !== null;
-                    });
+                    currentStores = items.filter(store => getFoodCategory(store.indsSclsNm, store.indsLclsNm, store.bizesNm) !== null);
 
                     document.getElementById('search-keyword').value = '';
                     renderStores(currentStores);
@@ -629,34 +624,29 @@
                 if (centerMarker) centerMarker.setMap(null);
                 if (centerCircle) centerCircle.setMap(null);
 
-                // 🚩 빨간색 깃발 아이콘 설정
-                const imageSrc = 'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_red.png'; // 카카오 지도 API 제공 빨간색 마커 이미지 (또는 깃발 아이콘 URL)
-                const imageSize = new kakao.maps.Size(40, 42); // 마커이미지의 크기
-                const imageOption = { offset: new kakao.maps.Point(13, 37) }; // 마커의 좌표와 일치시킬 이미지 안에서의 좌표
-
+                const imageSrc = 'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_red.png';
+                const imageSize = new kakao.maps.Size(40, 42);
+                const imageOption = { offset: new kakao.maps.Point(13, 37) };
                 const markerImage = new kakao.maps.MarkerImage(imageSrc, imageSize, imageOption);
 
-                // 중심점 마커 생성 (깃발/커스텀 이미지 적용)
                 centerMarker = new kakao.maps.Marker({
                     position: latlng,
                     image: markerImage
                 });
                 centerMarker.setMap(map);
 
-                // 반경 원 색상을 빨간색 계통으로 적용
                 centerCircle = new kakao.maps.Circle({
                     center: latlng,
                     radius: radius,
                     strokeWeight: 2,
-                    strokeColor: '#ff4d4d',   // 빨간색 테두리
+                    strokeColor: '#ff4d4d',
                     strokeOpacity: 0.8,
-                    fillColor: '#ff4d4d',     // 빨간색 채우기
-                    fillOpacity: 0.2          // 은은하게 보이도록 투명도 설정
+                    fillColor: '#ff4d4d',
+                    fillOpacity: 0.2
                 });
                 centerCircle.setMap(map);
             }
 
-            // 📍 [내 위치로 이동] 버튼 클릭 시 현재 위치 재탐색 및 검색 기능
             document.getElementById('current-location-btn').onclick = function() {
                 if (!navigator.geolocation) {
                     alert('이 브라우저는 위치 정보를 지원하지 않습니다.');
@@ -680,10 +670,7 @@
                         alert('현재 위치를 가져오지 못했습니다. 위치 권한을 확인해주세요.');
                         console.warn(error);
                     },
-                    {
-                        timeout: 10000,
-                        maximumAge: 0
-                    }
+                    { timeout: 10000, maximumAge: 0 }
                 );
             };
 
@@ -734,10 +721,7 @@
                         updateCenterMarker(defaultLatLng);
                         loadStores(centerLat, centerLng);
                     },
-                    {
-                        timeout: 10000,
-                        maximumAge: 0
-                    }
+                    { timeout: 10000, maximumAge: 0 }
                 );
             } else {
                 const defaultLatLng = new kakao.maps.LatLng(centerLat, centerLng);
