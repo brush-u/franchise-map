@@ -24,11 +24,12 @@
         .search-row { display: flex; gap: 8px; }
         .search-input { flex: 1; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; outline: none; }
         .search-input:focus { border-color: #0066ff; }
+        
+        /* 지도 서비스 선택 박스 (검색창 옆 배치) */
+        .map-selector { padding: 8px 10px; font-size: 13px; border-radius: 6px; border: 1px solid #cbd5e1; background: white; color: #0066ff; font-weight: bold; cursor: pointer; outline: none; width: 110px; }
+        
         .search-btn { padding: 8px 14px; background: #0066ff; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
         .search-btn:hover { background: #0052cc; }
-
-        .map-selector-row { display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: #475569; font-weight: bold; padding: 0 2px; }
-        .map-selector { padding: 6px 10px; font-size: 13px; border-radius: 6px; border: 1px solid #cbd5e1; background: white; color: #0066ff; font-weight: bold; cursor: pointer; outline: none; flex: 1; margin-left: 10px;}
 
         .store-list { flex: 1; overflow-y: auto; padding: 15px; }
         
@@ -91,16 +92,13 @@
         <div class="guide-text" id="guide-text-msg">💡 현재 위치 기준 500m 내 식당을 불러옵니다.</div>
         
         <div class="search-control-container">
-            <div class="map-selector-row">
-                <span>음식점 찾기:</span>
+            <div class="search-row">
+                <input type="text" id="search-keyword" class="search-input" placeholder="음식점 이름 또는 업종 검색">
                 <select id="map-platform-select" class="map-selector">
                     <option value="kakao">카카오맵</option>
                     <option value="naver">네이버 지도</option>
                     <option value="google">구글 맵</option>
                 </select>
-            </div>
-            <div class="search-row">
-                <input type="text" id="search-keyword" class="search-input" placeholder="음식점 이름 또는 업종 검색">
                 <button id="search-btn" class="search-btn">찾기</button>
             </div>
         </div>
@@ -180,8 +178,11 @@
             let centerLat = 37.566535;
             let centerLng = 126.977969;
             
+            // 지도 확대 레벨별 반경 설정 (최대 확대 레벨 1~2일 때 50m, 100m 지원)
             function getRadiusByLevel(level) {
-                if (level <= 3) return 300;     
+                if (level === 1) return 50;     
+                if (level === 2) return 100;    
+                if (level === 3) return 300;     
                 if (level === 4) return 500;    
                 if (level === 5) return 1000;   
                 if (level === 6) return 2000;   
