@@ -629,25 +629,21 @@
                 if (centerMarker) centerMarker.setMap(null);
                 if (centerCircle) centerCircle.setMap(null);
 
-                const imageSrc = 'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/markerStar.png'; 
-                const imageSize = new kakao.maps.Size(32, 37);
-                const imageOption = { offset: new kakao.maps.Point(16, 37) };
-                const markerImage = new kakao.maps.MarkerImage(imageSrc, imageSize, imageOption);
-
+                // 기존 기본 마커 스타일 적용
                 centerMarker = new kakao.maps.Marker({
-                    position: latlng,
-                    image: markerImage
+                    position: latlng
                 });
                 centerMarker.setMap(map);
 
+                // 기존 기본 반경 원 스타일 적용 (투명한 회색/기본 색상 계열)
                 centerCircle = new kakao.maps.Circle({
                     center: latlng,
                     radius: radius,
-                    strokeWeight: 3,
-                    strokeColor: '#0066ff',
-                    strokeOpacity: 0.9,
-                    fillColor: '#0066ff',
-                    fillOpacity: 0.12
+                    strokeWeight: 2,
+                    strokeColor: '#75B8FA',
+                    strokeOpacity: 0.8,
+                    fillColor: '#CFE7FF',
+                    fillOpacity: 0.3
                 });
                 centerCircle.setMap(map);
             }
