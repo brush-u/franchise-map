@@ -86,14 +86,13 @@
 
         <div class="sidebar-header">
             <span>🍽️ 반경 내 음식점 조회</span>
-            <!-- 전체 접기/펼치기 버튼 추가 -->
             <button id="global-toggle-btn" class="global-toggle-btn">모두 접기</button>
         </div>
         <div class="guide-text" id="guide-text-msg">💡 현재 위치 기준 500m 내 식당을 불러옵니다.</div>
         
         <div class="search-control-container">
             <div class="map-selector-row">
-                <span>🗺️ 상세조회 지도 서비스:</span>
+                <span>음식점 찾기:</span>
                 <select id="map-platform-select" class="map-selector">
                     <option value="kakao">카카오맵</option>
                     <option value="naver">네이버 지도</option>
@@ -205,9 +204,8 @@
             let currentMarkers = []; 
             let pinnedInfoWindow = null; 
             let currentStores = []; 
-            let isAllCollapsed = false; // 전체 접힘 상태 변수
+            let isAllCollapsed = false;
 
-            // 전체 접기/펼치기 버튼 동작 구현
             const globalToggleBtn = document.getElementById('global-toggle-btn');
             globalToggleBtn.onclick = function() {
                 isAllCollapsed = !isAllCollapsed;
