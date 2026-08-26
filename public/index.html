@@ -7,27 +7,27 @@
     <!-- 카카오 지도 SDK (services 라이브러리 포함) -->
     <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=__KAKAO_API_KEY__&libraries=services"></script>
     <style>
-        body { margin: 0; padding: 0; font-family: 'Malgun Gothic', sans-serif; display: flex; height: 100vh; overflow: hidden; }
+        body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; display: flex; height: 100vh; overflow: hidden; background: #000; }
         #map { flex: 2; height: 100%; position: relative; }
-        #sidebar { flex: 1; height: 100%; background: #f8f9fa; border-left: 1px solid #ddd; display: flex; flex-direction: column; }
+        #sidebar { flex: 1; height: 100%; background: #121212; color: #fff; border-left: 1px solid #2a2a2a; display: flex; flex-direction: column; }
         
-        .sidebar-header { padding: 15px 20px; background: #0066ff; color: white; font-size: 18px; font-weight: bold; display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; }
+        .sidebar-header { padding: 15px 20px; background: #1e1e1e; color: white; font-size: 16px; font-weight: bold; display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; border-bottom: 1px solid #2a2a2a; }
         
         .header-btn-wrap { display: flex; gap: 6px; }
-        .global-toggle-btn, .wishlist-tab-btn { background: rgba(255, 255, 255, 0.2); border: 1px solid rgba(255, 255, 255, 0.4); color: white; padding: 4px 8px; font-size: 12px; border-radius: 4px; cursor: pointer; font-weight: normal; }
-        .global-toggle-btn:hover, .wishlist-tab-btn:hover { background: rgba(255, 255, 255, 0.3); }
-        .wishlist-tab-btn.active { background: white; color: #0066ff; font-weight: bold; border-color: white; }
+        .global-toggle-btn, .wishlist-tab-btn { background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); color: white; padding: 4px 8px; font-size: 12px; border-radius: 4px; cursor: pointer; font-weight: normal; }
+        .global-toggle-btn:hover, .wishlist-tab-btn:hover { background: rgba(255, 255, 255, 0.2); }
+        .wishlist-tab-btn.active { background: #0066ff; color: white; font-weight: bold; border-color: #0066ff; }
 
-        .mobile-handle-bar { display: none; width: 100%; height: 28px; background: #f8f9fa; align-items: center; justify-content: center; cursor: grab; border-top: 1px solid #ddd; border-radius: 16px 16px 0 0; user-select: none; touch-action: none; flex-shrink: 0; }
+        .mobile-handle-bar { display: none; width: 100%; height: 28px; background: #1e1e1e; align-items: center; justify-content: center; cursor: grab; border-top: 1px solid #2a2a2a; border-radius: 20px 20px 0 0; user-select: none; touch-action: none; flex-shrink: 0; }
         .mobile-handle-bar:active { cursor: grabbing; }
-        .mobile-handle { width: 40px; height: 5px; background: #cbd5e1; border-radius: 3px; }
+        .mobile-handle { width: 36px; height: 4px; background: #555; border-radius: 2px; }
 
-        .search-control-container { padding: 12px 15px; background: #ffffff; border-bottom: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 8px; }
+        .search-control-container { padding: 10px 15px; background: #181818; border-bottom: 1px solid #2a2a2a; display: flex; flex-direction: column; gap: 8px; }
         .search-row { display: flex; gap: 8px; align-items: center; }
-        .search-input { flex: 1; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; outline: none; }
+        .search-input { flex: 1; padding: 8px 12px; border: 1px solid #333; background: #222; color: #fff; border-radius: 6px; font-size: 14px; outline: none; }
         .search-input:focus { border-color: #0066ff; }
         
-        .map-selector { padding: 8px 10px; font-size: 13px; border-radius: 6px; border: 1px solid #cbd5e1; background: white; color: #0066ff; font-weight: bold; cursor: pointer; outline: none; width: 105px; }
+        .map-selector { padding: 8px 10px; font-size: 13px; border-radius: 6px; border: 1px solid #333; background: #222; color: #60a5fa; font-weight: bold; cursor: pointer; outline: none; width: 105px; }
         
         .search-btn { padding: 8px 14px; background: #0066ff; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
         .search-btn:hover { background: #0052cc; }
@@ -37,14 +37,14 @@
             top: 20px;
             right: 20px;
             z-index: 5;
-            background: white;
-            border: 1px solid #cbd5e1;
+            background: #1e1e1e;
+            border: 1px solid #333;
             padding: 8px 14px;
-            border-radius: 6px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+            border-radius: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
             font-weight: bold;
             font-size: 13px;
-            color: #333;
+            color: #fff;
             cursor: pointer;
             display: flex;
             align-items: center;
@@ -53,74 +53,75 @@
             transition: 0.2s;
         }
         .geolocation-btn:hover {
-            background: #f1f5f9;
-            color: #0066ff;
+            background: #2a2a2a;
             border-color: #0066ff;
         }
 
-        .store-list { flex: 1; overflow-y: auto; padding: 15px; }
+        .store-list { flex: 1; overflow-y: auto; padding: 15px; background: #121212; }
         
         .group-section { margin-bottom: 20px; }
-        .group-title { font-size: 15px; font-weight: bold; color: #333; margin-bottom: 10px; padding-bottom: 5px; border-bottom: 2px solid #0066ff; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; }
-        .group-title:hover { color: #0066ff; }
+        .group-title { font-size: 14px; font-weight: bold; color: #aaa; margin-bottom: 10px; padding-bottom: 5px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; }
+        .group-title:hover { color: #fff; }
         .group-count-wrap { display: flex; align-items: center; gap: 8px; }
-        .group-count { background: #0066ff; color: white; font-size: 11px; padding: 2px 6px; border-radius: 10px; }
-        .toggle-icon { font-size: 12px; color: #666; transition: transform 0.2s; }
+        .group-count { background: #333; color: #fff; font-size: 11px; padding: 2px 6px; border-radius: 10px; }
+        .toggle-icon { font-size: 12px; color: #888; transition: transform 0.2s; }
         
-        .group-content { display: flex; flex-direction: column; gap: 8px; transition: all 0.3s ease; }
+        .group-content { display: flex; flex-direction: column; gap: 10px; transition: all 0.3s ease; }
         .group-content.collapsed { display: none; }
 
-        .store-card { background: white; padding: 12px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); cursor: pointer; transition: 0.2s; border-left: 4px solid #0066ff; position: relative; }
-        .store-card:hover { background: #f1f5f9; transform: translateY(-2px); }
-        .store-card.selected { background: #e0f2fe; border-left-color: #0284c7; }
+        /* 네이티브 앱 감성의 카드 디자인 스타일 */
+        .store-card { background: #1a1a1a; padding: 16px; border-radius: 12px; border: 1px solid #2a2a2a; box-shadow: 0 4px 10px rgba(0,0,0,0.2); cursor: pointer; transition: 0.2s; position: relative; }
+        .store-card:hover { background: #222; border-color: #444; transform: translateY(-2px); }
+        .store-card.selected { background: #1c2638; border-color: #0066ff; }
         
-        .store-name { font-size: 15px; font-weight: bold; color: #111; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; }
-        .store-info { font-size: 12px; color: #555; margin-bottom: 2px; }
-        .store-category { font-size: 11px; color: #0066ff; font-weight: bold; margin-top: 4px; }
+        .native-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
+        .store-name { font-size: 16px; font-weight: bold; color: #fff; display: flex; align-items: center; gap: 6px; }
         
         .rating-badge {
-            background: #fff8e1;
-            color: #f59e0b;
-            border: 1px solid #fde68a;
-            font-size: 11px;
+            color: #fbbf24;
+            font-size: 13px;
             font-weight: bold;
-            padding: 1px 6px;
-            border-radius: 10px;
             display: inline-flex;
             align-items: center;
-            gap: 3px;
-            margin-left: 6px;
-            vertical-align: middle;
+            gap: 2px;
         }
+        .review-count { color: #888; font-weight: normal; font-size: 12px; }
 
-        .wish-btn {
-            background: transparent;
-            border: none;
-            font-size: 16px;
-            cursor: pointer;
-            padding: 2px 4px;
-            transition: transform 0.1s;
-        }
+        .store-sub-info { font-size: 12px; color: #aaa; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+        .store-status-row { font-size: 12px; margin: 8px 0 12px 0; display: flex; align-items: center; justify-content: space-between; }
+        .status-open { color: #22c55e; font-weight: bold; }
+
+        /* 네이티브 앱 감성의 액션 버튼 바 ([경로], [시작], [통화], [공유]) */
+        .native-action-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; border-top: 1px solid #2a2a2a; padding-top: 12px; margin-top: 8px; }
+        .native-action-btn { background: #252525; border: 1px solid #333; color: #fff; padding: 8px 0; border-radius: 20px; font-size: 12px; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 4px; cursor: pointer; text-decoration: none; transition: 0.15s; }
+        .native-action-btn:hover { background: #0066ff; border-color: #0066ff; }
+
+        /* 사진 미리보기 썸네일 스트립 */
+        .native-photo-strip { display: flex; gap: 6px; overflow-x: auto; margin-top: 10px; padding-bottom: 4px; scrollbar-width: none; }
+        .native-photo-strip::-webkit-scrollbar { display: none; }
+        .native-thumbnail { width: 64px; height: 64px; border-radius: 8px; object-fit: cover; flex-shrink: 0; background: #333; border: 1px solid #333; }
+
+        .wish-btn { background: transparent; border: none; font-size: 18px; cursor: pointer; padding: 0; transition: transform 0.1s; }
         .wish-btn:active { transform: scale(1.25); }
 
-        .guide-text { padding: 8px 15px; background: #e0f2fe; color: #0369a1; font-size: 12px; border-bottom: 1px solid #bae6fd; line-height: 1.4; }
+        .guide-text { padding: 8px 15px; background: #162032; color: #60a5fa; font-size: 12px; border-bottom: 1px solid #1e3a8a; line-height: 1.4; }
 
         @media (max-width: 768px) {
             body { flex-direction: column; height: 100vh; position: relative; }
             #map { width: 100%; height: 100%; flex: none; position: absolute; top: 0; left: 0; z-index: 1; }
             
-            .geolocation-btn { top: 15px; right: 15px; padding: 6px 10px; font-size: 12px; }
+            .geolocation-btn { top: 15px; right: 15px; padding: 6px 12px; font-size: 12px; }
 
             #sidebar { 
                 position: absolute; 
                 bottom: 0; 
                 left: 0; 
                 width: 100%; 
-                height: 38vh; 
+                height: 42vh; 
                 z-index: 10; 
                 border-left: none; 
-                border-top: 1px solid #ddd;
-                box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+                border-top: 1px solid #2a2a2a;
+                box-shadow: 0 -8px 24px rgba(0,0,0,0.5);
                 border-radius: 20px 20px 0 0;
                 transition: height 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
             }
@@ -133,7 +134,7 @@
 
     <div id="map">
         <button id="current-location-btn" class="geolocation-btn">
-            📍 내 위치로 이동
+            📍 내 위치
         </button>
     </div>
 
@@ -180,7 +181,7 @@
             
             const getHeights = () => ({
                 peek: window.innerHeight * 0.12,
-                half: window.innerHeight * 0.38,
+                half: window.innerHeight * 0.42,
                 full: window.innerHeight * 0.88
             });
 
@@ -562,22 +563,15 @@
                         const mapUrl = getMapSearchUrl(selectedPlatform, name, address);
                         const isW = isWished(store);
                         const wishIcon = isW ? '❤️' : '🤍';
-                        const ratingBadgeHtml = `<span style="background:#fff8e1; color:#f59e0b; font-size:11px; padding:1px 4px; border-radius:4px; font-weight:bold; margin-left:4px;">⭐ ${rating} (${reviewCount})</span>`;
                         
                         const infowindowContent = `
-                            <div style="padding:10px; font-size:12px; width:230px; line-height:1.4;">
-                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                                    <a href="${mapUrl}" target="_blank" style="font-weight:bold; font-size:14px; color:#0066ff; text-decoration:none;">
-                                        ${name} ${ratingBadgeHtml} 🔗
-                                    </a>
-                                </div>
-                                <div><strong>업종:</strong> ${category}</div>
-                                <div><strong>주소:</strong> ${address}</div>
-                                <div><strong>전화:</strong> ${tel}</div>
-                                <div><strong>거리:</strong> 중심지에서 약 ${distanceMeters}m</div>
-                                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
-                                    <span style="color:#16a34a; font-weight:bold;">🟢 영업중</span>
-                                    <button onclick="window.toggleWishFromWindow('${getStoreKey(store)}')" style="background:#f1f5f9; border:1px solid #cbd5e1; border-radius:4px; padding:2px 6px; cursor:pointer; font-size:11px;">${wishIcon} 찜하기</button>
+                            <div style="padding:10px; font-size:12px; width:220px; line-height:1.4; background:#1e1e1e; color:#fff; border-radius:8px;">
+                                <div style="font-weight:bold; font-size:14px; margin-bottom:4px; color:#fff;">${name}</div>
+                                <div>⭐ ${rating} (${reviewCount}) · 🟢 영업 중</div>
+                                <div style="color:#aaa; margin-top:4px;">${address}</div>
+                                <div style="margin-top:8px; display:flex; justify-content:space-between;">
+                                    <a href="${mapUrl}" target="_blank" style="color:#60a5fa; text-decoration:none;">지도 앱에서 보기 ↗</a>
+                                    <button onclick="window.toggleWishFromWindow('${getStoreKey(store)}')" style="background:#333; color:#fff; border:none; padding:2px 6px; border-radius:4px; cursor:pointer;">${wishIcon} 찜</button>
                                 </div>
                             </div>
                         `;
@@ -640,29 +634,57 @@
 
                     storeList.forEach((store) => {
                         const name = store.bizesNm || '상호명 없음';
-                        const category = store.indsSclsNm || '업종 정보 없음';
+                        const category = store.indsSclsNm || '음식점';
                         const address = store.rdnmAdr || store.lnoAdr || '주소 정보 없음';
                         const tel = (store.telno && store.telno.trim() !== '') ? store.telno : generateMockTel(store.bizesId, address);
                         const mapUrl = getMapSearchUrl(selectedPlatform, name, address);
-                        const ratingBadgeHtml = `<span class="rating-badge">⭐ ${store.rating} (${store.reviewCount})</span>`;
                         const isW = isWished(store);
 
                         const card = document.createElement('div');
                         card.className = 'store-card';
                         store._cardElement = card; 
 
+                        // 음식점 고유 해시값을 이용한 가상 대표 사진 썸네일 생성 (Unsplash 음식 사진 랜덤 매칭)
+                        const hash = Math.abs(hashCode(store.bizesId || name));
+                        const photoId1 = 1040 + (hash % 25);
+                        const photoId2 = 1060 + ((hash * 3) % 25);
+                        const photoId3 = 1080 + ((hash * 7) % 25);
+
                         card.innerHTML = `
-                            <div class="store-name">
-                                <span>${name} ${ratingBadgeHtml}</span>
-                                <div style="display:flex; align-items:center; gap:6px;">
-                                    <button class="wish-btn" title="찜하기">${isW ? '❤️' : '🤍'}</button>
-                                    <a href="${mapUrl}" target="_blank" onclick="event.stopPropagation();" style="font-size:11px; color:#0066ff; text-decoration:none; font-weight:normal;">[상세보기 ↗]</a>
+                            <div class="native-card-header">
+                                <div class="store-name">
+                                    <span>${name}</span>
                                 </div>
+                                <button class="wish-btn" title="찜하기">${isW ? '❤️' : '🤍'}</button>
                             </div>
-                            <div class="store-info">📍 ${address}</div>
-                            <div class="store-info">☎️ ${tel} | 📏 ${store.distanceMeters}m</div>
-                            <div class="store-info" style="color: #16a34a; font-weight: bold;">🟢 영업중 (매일 10:00 - 22:00)</div>
-                            <div class="store-category">🏷️ ${category}</div>
+                            <div class="store-sub-info">
+                                <span class="rating-badge">★ ${store.rating}</span>
+                                <span class="review-count">(${store.reviewCount})</span>
+                                <span>·</span>
+                                <span>${category}</span>
+                                <span>·</span>
+                                <span>₩1만~3만</span>
+                            </div>
+                            <div class="store-status-row">
+                                <span class="status-open">🟢 영업 중</span>
+                                <span style="color: #888;">· 21:00에 영업 종료</span>
+                            </div>
+                            <div class="store-sub-info">📍 ${address} (${store.distanceMeters}m)</div>
+                            
+                            <!-- 사진 미리보기 썸네일 스트립 -->
+                            <div class="native-photo-strip">
+                                <img class="native-thumbnail" src="https://picsum.photos/id/${photoId1}/100/100" alt="매장 사진">
+                                <img class="native-thumbnail" src="https://picsum.photos/id/${photoId2}/100/100" alt="음식 사진">
+                                <img class="native-thumbnail" src="https://picsum.photos/id/${photoId3}/100/100" alt="메뉴 사진">
+                            </div>
+
+                            <!-- 네이티브 앱 감성 액션 버튼 바 -->
+                            <div class="native-action-bar">
+                                <a href="${mapUrl}" target="_blank" onclick="event.stopPropagation();" class="native-action-btn">🧭 경로</a>
+                                <a href="${mapUrl}" target="_blank" onclick="event.stopPropagation();" class="native-action-btn">🚗 시작</a>
+                                <a href="tel:${tel}" onclick="event.stopPropagation();" class="native-action-btn">📞 통화</a>
+                                <button onclick="event.stopPropagation(); alert('링크가 복사되었습니다!');" class="native-action-btn">🔗 공유</button>
+                            </div>
                         `;
 
                         const wishBtn = card.querySelector('.wish-btn');
@@ -749,7 +771,6 @@
                     const category = store.indsSclsNm || '즐겨찾기 맛집';
                     const mapUrl = getMapSearchUrl(selectedPlatform, name, address);
                     const { rating, reviewCount } = getStoreRatingAndReviews(store);
-                    const ratingBadgeHtml = `<span class="rating-badge">⭐ ${rating} (${reviewCount})</span>`;
 
                     if (store.lat && store.lon) {
                         const markerPosition = new kakao.maps.LatLng(store.lat, store.lon);
@@ -757,7 +778,7 @@
                         marker.setMap(map);
 
                         const infowindow = new kakao.maps.InfoWindow({
-                            content: `<div style="padding:10px; font-size:12px; width:220px;"><strong>${name}</strong><br>주소: ${address}<br><a href="${mapUrl}" target="_blank" style="color:#0066ff;">상세보기 ↗</a></div>`,
+                            content: `<div style="padding:10px; font-size:12px; width:200px; background:#1e1e1e; color:#fff;"><strong>${name}</strong><br><a href="${mapUrl}" target="_blank" style="color:#60a5fa;">상세보기 ↗</a></div>`,
                             removable: true
                         });
 
@@ -773,16 +794,24 @@
                     store._cardElement = card;
 
                     card.innerHTML = `
-                        <div class="store-name">
-                            <span>${name} ${ratingBadgeHtml}</span>
-                            <div style="display:flex; align-items:center; gap:6px;">
-                                <button class="wish-btn" title="찜 해제">❤️</button>
-                                <a href="${mapUrl}" target="_blank" onclick="event.stopPropagation();" style="font-size:11px; color:#0066ff; text-decoration:none; font-weight:normal;">[상세보기 ↗]</a>
-                            </div>
+                        <div class="native-card-header">
+                            <div class="store-name"><span>${name}</span></div>
+                            <button class="wish-btn" title="찜 해제">❤️</button>
                         </div>
-                        <div class="store-info">📍 ${address}</div>
-                        <div class="store-info">☎️ ${tel}</div>
-                        <div class="store-category">🏷️ ${category}</div>
+                        <div class="store-sub-info">
+                            <span class="rating-badge">★ ${rating}</span>
+                            <span class="review-count">(${reviewCount})</span>
+                            <span>·</span>
+                            <span>${category}</span>
+                        </div>
+                        <div class="store-sub-info">📍 ${address}</div>
+                        
+                        <div class="native-action-bar">
+                            <a href="${mapUrl}" target="_blank" onclick="event.stopPropagation();" class="native-action-btn">🧭 경로</a>
+                            <a href="${mapUrl}" target="_blank" onclick="event.stopPropagation();" class="native-action-btn">🚗 시작</a>
+                            <a href="tel:${tel}" onclick="event.stopPropagation();" class="native-action-btn">📞 통화</a>
+                            <button onclick="event.stopPropagation(); alert('링크가 복사되었습니다!');" class="native-action-btn">🔗 공유</button>
+                        </div>
                     `;
 
                     const wishBtn = card.querySelector('.wish-btn');
@@ -891,10 +920,10 @@
                     center: latlng,
                     radius: fixedRadius,
                     strokeWeight: 2,
-                    strokeColor: '#ff4d4d',
+                    strokeColor: '#3b82f6',
                     strokeOpacity: 0.8,
-                    fillColor: '#ff4d4d',
-                    fillOpacity: 0.2
+                    fillColor: '#3b82f6',
+                    fillOpacity: 0.15
                 });
                 centerCircle.setMap(map);
 
@@ -909,7 +938,7 @@
                         updateGuideText(fullAddress);
 
                         centerInfoWindow = new kakao.maps.InfoWindow({
-                            content: `<div style="padding:8px 12px; font-size:12px; font-weight:bold; color:#d32f2f;">📍 선택된 중심 위치 (반경 500m)<br><span style="font-weight:normal; color:#333;">${fullAddress}</span></div>`,
+                            content: `<div style="padding:8px 12px; font-size:12px; font-weight:bold; color:#f87171; background:#1e1e1e;">📍 선택된 중심 위치 (반경 500m)<br><span style="font-weight:normal; color:#fff;">${fullAddress}</span></div>`,
                             removable: true
                         });
 
@@ -951,9 +980,6 @@
                     { timeout: 10000, maximumAge: 0 }
                 );
             };
-
-            kakao.maps.event.addListener(map, 'zoom_changed', function() {
-            });
 
             kakao.maps.event.addListener(map, 'click', function(mouseEvent) {
                 if (window.innerWidth <= 768) {
