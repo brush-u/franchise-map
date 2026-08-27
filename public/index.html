@@ -6,8 +6,12 @@
     <title>뭐 먹지? 근처 맛집 찾기 & 상권 분석</title>
     <!-- 구글 맵 API 로드 -->
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDfrimvyT5Z_mB64ljqmURgJgqbqhi7t88&libraries=places"></script>
+    <!-- 마커가 많을 때 성능을 위한 클러스터링 라이브러리 -->
+    <script src="https://unpkg.com/@googlemaps/markerclusterer@2.5.3/dist/index.min.js"></script>
     <style>
-        body { margin: 0; padding: 0; font-family: 'Malgun Gothic', sans-serif; display: flex; height: 100vh; overflow: hidden; background: #f1f5f9; }
+        *{box-sizing:border-box}
+        html,body{height:100%;margin:0;padding:0}
+        body { font-family: 'Malgun Gothic', sans-serif; display: flex; height: 100vh; height: 100dvh; overflow: hidden; background: #f1f5f9; }
         
         #map-wrap { flex: 3; height: 100%; position: relative; }
         #map { width: 100%; height: 100%; }
@@ -146,6 +150,7 @@
         .store-list { flex: 1; overflow-y: auto; padding: 15px; background: #f8fafc; -webkit-overflow-scrolling: touch; }
         
         .group-section { margin-bottom: 20px; }
+        .group-section:last-child { margin-bottom: 0; }
         .group-title { font-size: 15px; font-weight: bold; color: #1e293b; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 2px solid #2563eb; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; }
         .group-title:hover { color: #2563eb; }
         .group-count-wrap { display: flex; align-items: center; gap: 8px; }
@@ -256,21 +261,41 @@
             line-height: 1.6;
         }
 
+        /* ── 데스크톱 전용: 사이드바 크기조절(드래그) ── */
         @media (min-width: 769px) {
             #sidebar {
                 position: relative;
-                width: auto;
+                width: 380px;
+                flex: none;
                 height: 100% !important;
-                flex: 1.4;
                 border-top: none;
                 border-left: 1px solid #e2e8f0;
                 border-radius: 0;
+                overflow: hidden;
             }
-            #map-wrap { flex: 2.6; }
+            #map-wrap { flex: 1; }
             .sidebar-header { border-radius: 0; }
             .handle-indicator-wrap { display: none; }
             .mode-tabs-container { border-radius: 0; }
+            /* 데스크톱에서 첫 탭 버튼에 남아있던 둥근 모서리 제거 (모바일 바텀시트용 스타일이 잘못 남아있던 것) */
+            .mode-tab-btn:first-child { border-top-left-radius: 0; }
+
+            #sidebar.resizing { transition: none; }
+
+            /* 마우스로 좌우 드래그해서 폭을 조절하는 손잡이 */
+            .sidebar-resize-handle {
+                position: absolute;
+                left: -3px; top: 0; bottom: 0;
+                width: 6px;
+                cursor: ew-resize;
+                z-index: 600;
+                background: transparent;
+            }
+            .sidebar-resize-handle:hover,
+            .sidebar-resize-handle.active { background: rgba(37, 99, 235, 0.35); }
         }
+
+
     </style>
 </head>
 <body>
@@ -283,6 +308,7 @@
     </div>
 
     <div id="sidebar">
+        <div class="sidebar-resize-handle" id="sidebarResizeHandle"></div>
         <div class="handle-indicator-wrap" id="drag-handle">
             <div class="mobile-handle"></div>
         </div>
@@ -342,7 +368,7 @@
 
             <div class="analysis-dashboard" id="dashboard-content" style="display: flex; flex-direction: column; gap: 12px;">
                 <div style="background: white; padding: 16px; border-radius: 10px; border: 1px solid #e2e8f0; text-align: center; color: #64748b; font-size: 13px;">
-                    지도를 클릭하거나 위치를 지정하면 3001번 분석 서버와 연동됩니다.
+                    지도를 클릭하거나 위치를 지정하면 분석 서버와 연동됩니다.
                 </div>
             </div>
         </div>
@@ -386,25 +412,11 @@
 
             try {
                 
-                //const response = await fetch(`http://localhost:3001/api/v1/analysis/execute`, {
-                    //method: 'POST',
-                    //headers: { 'Content-Type': 'application/json' },
-                    //body: JSON.stringify({ lat: currentLat, lng: currentLng, module_id: mode, radius: 400 })
-                //});
-                
-                // [수정 전 예시]
-// const response = await fetch('http://localhost:3001/api/v1/analysis/execute', { ... });
-
-// [수정 후: 웹 클라우드 배포 및 로컬 환경 자동 분기]
-const analysisApiUrl = window.location.hostname === 'localhost' 
-    ? 'http://localhost:3001/api/v1/analysis/execute' 
-    : '/api/v1/analysis/execute';
-
-const response = await fetch(analysisApiUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ lat: currentLat, lng: currentLng, module_id: mode, radius: 400 })
-});
+                const response = await fetch('/api/v1/analysis/execute', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ lat: currentLat, lng: currentLng, module_id: mode, radius: 400 })
+                });
 
 
                 const json = await response.json();
@@ -416,6 +428,9 @@ const response = await fetch(analysisApiUrl, {
                 const getPercent = (val, max) => Math.min(Math.round((val / max) * 100), 100);
 
                 html += `
+                    <div style="background: #fff3cd; border: 1px solid #ffe69c; color: #997404; border-radius: 8px; padding: 10px 14px; font-size: 12px; line-height:1.5; margin-bottom: 4px;">
+                        ⚠️ <strong>시뮬레이션 데이터입니다.</strong> 아래 수치는 실제 공공데이터 기반 분석이 아니라 데모용 예시 값입니다. 실제 창업/투자 판단에 사용하지 마세요.
+                    </div>
                     <div style="font-size: 15px; font-weight: bold; color: #1e293b; margin-bottom: 2px;">📈 ${res.title}</div>
                     <div class="analysis-metric-grid">
                         <div class="analysis-card">
@@ -495,7 +510,7 @@ const response = await fetch(analysisApiUrl, {
 
                 dashboardContainer.innerHTML = html;
             } catch (error) {
-                dashboardContainer.innerHTML = `<div style="background: white; padding: 16px; border-radius: 10px; border: 1px solid #fecaca; text-align: center; color: #ef4444; font-size: 13px;">⚠️ 분석 서버(http://localhost:3001) 연결 실패<br><span style="font-size:11px; color:#64748b;">서버가 구동 중인지 확인해주세요.</span></div>`;
+                dashboardContainer.innerHTML = `<div style="background: white; padding: 16px; border-radius: 10px; border: 1px solid #fecaca; text-align: center; color: #ef4444; font-size: 13px;">⚠️ 분석 서버 연결 실패<br><span style="font-size:11px; color:#64748b;">서버가 구동 중인지 확인해주세요.</span></div>`;
             }
         }
 
@@ -515,6 +530,50 @@ const response = await fetch(analysisApiUrl, {
             const dragHandle = document.getElementById('drag-handle');
             const sidebarHeader = document.getElementById('sidebar-header-toggle');
             const sizeToggleArrowBtn = document.getElementById('size-toggle-arrow-btn');
+
+            // ── 데스크톱 사이드바: 마우스로 드래그해서 폭 조절 (조절한 폭은 자동으로 기억됨) ──
+            const sidebarResizeHandle = document.getElementById('sidebarResizeHandle');
+            const SIDEBAR_WIDTH_KEY = 'foodmap_sidebar_width_v1';
+            const DEFAULT_SIDEBAR_WIDTH = 380;
+            const MIN_SIDEBAR_WIDTH = 280;
+            const MAX_SIDEBAR_WIDTH = 720;
+
+            function loadSidebarWidth() {
+                try {
+                    const saved = parseInt(localStorage.getItem(SIDEBAR_WIDTH_KEY), 10);
+                    if (saved >= MIN_SIDEBAR_WIDTH && saved <= MAX_SIDEBAR_WIDTH) return saved;
+                } catch (e) {}
+                return DEFAULT_SIDEBAR_WIDTH;
+            }
+
+            if (window.innerWidth > 768) {
+                sidebar.style.width = loadSidebarWidth() + 'px';
+            }
+
+            if (sidebarResizeHandle) {
+                let resizing = false;
+                sidebarResizeHandle.addEventListener('mousedown', function (e) {
+                    if (window.innerWidth <= 768) return;
+                    resizing = true;
+                    sidebar.classList.add('resizing');
+                    sidebarResizeHandle.classList.add('active');
+                    document.body.style.userSelect = 'none';
+                    e.preventDefault();
+                });
+                window.addEventListener('mousemove', function (e) {
+                    if (!resizing) return;
+                    const newWidth = Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, window.innerWidth - e.clientX));
+                    sidebar.style.width = newWidth + 'px';
+                });
+                window.addEventListener('mouseup', function () {
+                    if (!resizing) return;
+                    resizing = false;
+                    sidebar.classList.remove('resizing');
+                    sidebarResizeHandle.classList.remove('active');
+                    document.body.style.userSelect = '';
+                    try { localStorage.setItem(SIDEBAR_WIDTH_KEY, parseInt(sidebar.style.width, 10)); } catch (e) {}
+                });
+            }
 
             const heights = ['12vh', '40vh', '88vh'];
             let currentHeightIndex = 1;
@@ -570,9 +629,9 @@ const response = await fetch(analysisApiUrl, {
             window.addEventListener('mousemove', (e) => onDragMove(e.clientY));
             window.addEventListener('mouseup', onDragEnd);
 
-            dragHandle.addEventListener('touchstart', (e) => onDragStart(e.touches[0].clientY));
-            window.addEventListener('touchmove', (e) => onDragMove(e.touches[0].clientY));
-            window.addEventListener('touchend', onDragEnd);
+            dragHandle.addEventListener('touchstart', (e) => onDragStart(e.touches[0].clientY), { passive: true });
+            window.addEventListener('touchmove', (e) => onDragMove(e.touches[0].clientY), { passive: true });
+            window.addEventListener('touchend', onDragEnd, { passive: true });
 
             const statusMsg = document.getElementById('status-msg');
             if (typeof google === 'undefined' || !google.maps) {
@@ -602,13 +661,39 @@ const response = await fetch(analysisApiUrl, {
                 streetViewControl: false,
                 mapTypeControl: false,
                 fullscreenControl: true,
-                zoomControlOptions: { position: google.maps.ControlPosition.RIGHT_BOTTOM }
+                // 확대/축소 버튼이 오른쪽 하단에 있으면 데스크톱에서 사이드바 경계와 겹쳐서
+                // 회색 컨트롤 배경이 어중간하게 걸리는 것처럼 보였다. 왼쪽 하단으로 옮겨서 피한다.
+                zoomControlOptions: { position: google.maps.ControlPosition.LEFT_BOTTOM }
             });
 
             const geocoder = new google.maps.Geocoder();
             let centerMarker = null;
             let centerCircle = null;
-            let currentMarkers = []; 
+            let currentMarkers = [];
+            // 클러스터 클릭으로 인한 줌 변경인지 구분하는 플래그.
+            // true일 때만 zoom_changed 핸들러가 검색 중심 좌표를 지도 중심으로 다시 맞춘다.
+            // (마우스 휠/핀치로 직접 줌인아웃할 때는 이 플래그가 false라서 처음 찍은 위치가 그대로 고정된다)
+            let clusterZoomPending = false;
+
+            // 마커가 많을 때(수백 개) 하나씩 다 그리면 느려지므로 클러스터링으로 묶어서 표시한다.
+            // 확대하면 자동으로 개별 마커로 풀린다.
+            const mapClusterer = (window.markerClusterer && window.markerClusterer.MarkerClusterer)
+                ? new window.markerClusterer.MarkerClusterer({
+                    map,
+                    // 클러스터를 클릭했을 때 fitBounds로 확 확대했다가 다시 줄이면(이전 방식)
+                    // 눈에 확 튀었다가 되돌아오는 것처럼 보여서 어지럽다는 피드백이 있었다.
+                    // 그래서 목표 줌 레벨을 미리 정해서 한 번에 이동시킨다 (왔다갔다 없음).
+                    onClusterClick: (event, cluster, mapInstance) => {
+                        clusterZoomPending = true;
+                        const targetZoom = Math.min(mapInstance.getZoom() + 3, 17);
+                        mapInstance.panTo(cluster.position);
+                        mapInstance.setZoom(targetZoom);
+                        google.maps.event.addListenerOnce(mapInstance, 'idle', () => {
+                            clusterZoomPending = false;
+                        });
+                    },
+                })
+                : null;
             let activePopupOverlay = null;
             let currentStores = []; 
             let isAllCollapsed = false;
@@ -703,7 +788,11 @@ const response = await fetch(analysisApiUrl, {
             }
 
             function clearMarkers() {
-                currentMarkers.forEach(item => item.marker.setMap(null));
+                if (mapClusterer) {
+                    mapClusterer.clearMarkers();
+                } else {
+                    currentMarkers.forEach(item => item.marker.setMap(null));
+                }
                 currentMarkers = [];
                 if (activePopupOverlay) {
                     activePopupOverlay.setMap(null);
@@ -738,24 +827,73 @@ const response = await fetch(analysisApiUrl, {
                 return { rating: (4.0 + (hashVal % 11) * 0.1).toFixed(1), reviewCount: (hashVal % 85) + 8 };
             }
 
-            function getFoodCategory(indsName, indsLargeName, storeName) {
-                const text = ((indsName || '') + ' ' + (indsLargeName || '') + ' ' + (storeName || '')).toLowerCase();
+            // 음식 카테고리 표시 순서 (고정) — 나머지(목록에 없는 값)는 뒤쪽에 개수 많은 순으로 붙는다.
+            const CATEGORY_ORDER = ['한식', '중식', '일식/회', '양식', '분식', '치킨', '패스트푸드', '카페/디저트', '제과/베이커리', '주점/술집', '기타 음식점'];
+
+            // 공공데이터 중분류명(indsMclsNm)을 화면 표시용 카테고리로 정리한다.
+            // 상호명 텍스트 추측이 아니라 데이터가 제공하는 공식 분류값을 그대로 신뢰하는 게 원칙.
+            function normalizeMclsCategory(mclsNm) {
+                const m = (mclsNm || '').trim();
+                if (!m) return null;
+                if (m.includes('한식')) return '한식';
+                if (m.includes('중식')) return '중식';
+                if (m.includes('일식')) return '일식/회';
+                if (m.includes('서양식') || m.includes('양식')) return '양식';
+                if (m.includes('분식')) return '분식';
+                if (m.includes('치킨') || m.includes('닭') || m.includes('오리')) return '치킨';
+                if (m.includes('패스트푸드') || m.includes('피자') || m.includes('햄버거') || m.includes('샌드위치')) return '패스트푸드';
+                if (m.includes('커피') || m.includes('카페') || m.includes('음료') || m.includes('디저트')) return '카페/디저트';
+                if (m.includes('제과') || m.includes('베이커리') || m.includes('빵')) return '제과/베이커리';
+                if (m.includes('주점') || m.includes('호프') || m.includes('술집')) return '주점/술집';
+                // 매핑 목록에 없는 중분류는 추측해서 억지로 끼워 맞추지 않고,
+                // 데이터에 있는 값 그대로 노출한다 (예: "기타 간이 음식점업" 등).
+                return m;
+            }
+
+            function getFoodCategory(indsSclsNm, indsLclsNm, storeName, indsMclsNm) {
+                const text = ((indsSclsNm || '') + ' ' + (indsLclsNm || '') + ' ' + (storeName || '')).toLowerCase();
                 const excludeKeywords = ['부동산', '중개', '미용', '헤어', '뷰티', '피부', '사우나', '세탁', 'pc방', '약국', '병원', '의원', '학원', '주유소', '헬스', '정비', '안경', '의류', '꽃집', '애완', '인테리어', '사진', '공방', '세무', '교회', '사찰', '마사지'];
                 for (const kw of excludeKeywords) if (text.includes(kw)) return null;
 
+                // 1차 판단: 대분류명이 정확히 "음식"이면 무조건 음식점으로 취급한다.
+                // 상호명에 음식 관련 단어가 전혀 없어도(예: "유리네") 이 필드가 신뢰의 기준이다.
+                const isFoodByLclsNm = (indsLclsNm || '').trim() === '음식';
+
                 const foodCheckKeywords = ['식당', '음식', '요리', '한식', '중식', '일식', '양식', '분식', '구이', '찌개', '국밥', '회', '초밥', '고기', '냉면', '백반', '면', '족발', '보쌈', '치킨', '호프', '주점', '카페', '커피', '빵', '피자', '햄버거'];
-                let isFood = false;
-                for (const fk of foodCheckKeywords) { if (text.includes(fk)) { isFood = true; break; } }
+                let isFoodByKeyword = false;
+                for (const fk of foodCheckKeywords) { if (text.includes(fk)) { isFoodByKeyword = true; break; } }
+
+                // 대분류명이 아예 없는(데이터 누락) 경우에만 키워드 매칭으로 보조 판단한다.
+                const isFood = isFoodByLclsNm || (!indsLclsNm && isFoodByKeyword);
                 if (!isFood) return null;
 
-                if (text.includes('한식') || text.includes('국밥') || text.includes('고기') || text.includes('냉면') || text.includes('백반') || text.includes('삼겹살') || text.includes('찌개') || text.includes('국수') || text.includes('갈비') || text.includes('탕')) return '한식';
+                // 2차 판단: 세부 카테고리는 공식 중분류명(indsMclsNm)을 우선 신뢰한다.
+                const byMcls = normalizeMclsCategory(indsMclsNm);
+                if (byMcls) return byMcls;
+
+                // 중분류명 자체가 없는 예외적인 경우에만 키워드 기반 보조 분류를 쓴다.
+                if (text.includes('한식') || text.includes('국밥') || text.includes('백반') || text.includes('삼겹살') || text.includes('찌개') || text.includes('갈비') || text.includes('냉면')) return '한식';
                 if (text.includes('중식') || text.includes('짜장') || text.includes('짬뽕')) return '중식';
-                if (text.includes('일식') || text.includes('초밥') || text.includes('회') || text.includes('돈가스')) return '일식/회';
-                if (text.includes('양식') || text.includes('피자') || text.includes('스테이크') || text.includes('파스타')) return '양식/패스트푸드';
-                if (text.includes('커피') || text.includes('카페') || text.includes('디저트') || text.includes('빵')) return '카페/디저트';
+                if (text.includes('일식') || text.includes('초밥') || text.includes('돈가스')) return '일식/회';
+                if (text.includes('양식') || text.includes('스테이크') || text.includes('파스타')) return '양식';
+                if (text.includes('피자') || text.includes('햄버거')) return '패스트푸드';
+                if (text.includes('커피') || text.includes('카페') || text.includes('디저트')) return '카페/디저트';
+                if (text.includes('빵') || text.includes('베이커리')) return '제과/베이커리';
                 if (text.includes('분식') || text.includes('김밥') || text.includes('떡볶이')) return '분식';
-                if (text.includes('치킨') || text.includes('호프') || text.includes('주점') || text.includes('포차')) return '치킨/술집';
+                if (text.includes('치킨')) return '치킨';
+                if (text.includes('호프') || text.includes('주점') || text.includes('포차')) return '주점/술집';
                 return '기타 음식점';
+            }
+
+            function sortGroupEntries(groups) {
+                return Object.entries(groups).sort(([aName, aList], [bName, bList]) => {
+                    const ai = CATEGORY_ORDER.indexOf(aName);
+                    const bi = CATEGORY_ORDER.indexOf(bName);
+                    if (ai !== -1 && bi !== -1) return ai - bi;      // 둘 다 고정 순서에 있으면 그 순서대로
+                    if (ai !== -1) return -1;                          // 고정 순서에 있는 쪽을 앞으로
+                    if (bi !== -1) return 1;
+                    return bList.length - aList.length;               // 둘 다 모르는 카테고리면 개수 많은 순
+                });
             }
 
             function createCustomPopup(store, position) {
@@ -841,8 +979,9 @@ const response = await fetch(analysisApiUrl, {
                 }
 
                 const groups = {};
+                const newMarkers = [];
                 storesToRender.forEach((store) => {
-                    const groupKey = getFoodCategory(store.indsSclsNm, store.indsLclsNm, store.bizesNm);
+                    const groupKey = getFoodCategory(store.indsSclsNm, store.indsLclsNm, store.bizesNm, store.indsMclsNm);
                     if (!groupKey) return; 
 
                     if (!groups[groupKey]) groups[groupKey] = [];
@@ -858,14 +997,19 @@ const response = await fetch(analysisApiUrl, {
 
                     if (!isNaN(storeLat) && !isNaN(storeLon)) {
                         const markerPos = { lat: storeLat, lng: storeLon };
-                        const marker = new google.maps.Marker({ position: markerPos, map: map });
+                        // 클러스터러를 쓸 땐 map을 바로 지정하지 않고 클러스터러가 관리하게 한다.
+                        const marker = new google.maps.Marker({ position: markerPos, map: mapClusterer ? null : map });
                         marker.addListener('click', () => createCustomPopup(store, markerPos));
                         currentMarkers.push({ marker, store });
+                        newMarkers.push(marker);
                     }
                 });
+                if (mapClusterer && newMarkers.length > 0) {
+                    mapClusterer.addMarkers(newMarkers);
+                }
 
                 let totalCount = 0;
-                for (const [groupName, storeList] of Object.entries(groups)) {
+                for (const [groupName, storeList] of sortGroupEntries(groups)) {
                     totalCount += storeList.length;
                     const section = document.createElement('div');
                     section.className = 'group-section';
@@ -889,7 +1033,10 @@ const response = await fetch(analysisApiUrl, {
 
                     storeList.sort((a, b) => b.rating - a.rating || b.reviewCount - a.reviewCount || a.distanceMeters - b.distanceMeters);
 
-                    storeList.forEach((store) => {
+                    // 카테고리 하나에 업소가 아주 많으면(관광지 등) 카드를 한 번에 다 그리는 것 자체가
+                    // 눈에 띄게 느려진다. 처음엔 상위 일부만 그리고, 나머지는 '더보기'로 필요할 때만 그린다.
+                    const INITIAL_RENDER_COUNT = 20;
+                    const buildCard = (store) => {
                         const name = store.bizesNm || '상호명 없음';
                         const address = store.rdnmAdr || store.lnoAdr || '주소 정보 없음';
                         const tel = (store.telno && store.telno.trim() !== '') ? store.telno : generateMockTel(store.bizesId, address);
@@ -897,7 +1044,7 @@ const response = await fetch(analysisApiUrl, {
 
                         const card = document.createElement('div');
                         card.className = 'store-card';
-                        store._cardElement = card; 
+                        store._cardElement = card;
 
                         card.innerHTML = `
                             <div class="store-name">
@@ -920,8 +1067,28 @@ const response = await fetch(analysisApiUrl, {
                                 createCustomPopup(store, pos);
                             }
                         };
-                        contentDiv.appendChild(card);
+                        return card;
+                    };
+
+                    storeList.slice(0, INITIAL_RENDER_COUNT).forEach((store) => {
+                        contentDiv.appendChild(buildCard(store));
                     });
+
+                    if (storeList.length > INITIAL_RENDER_COUNT) {
+                        const remaining = storeList.length - INITIAL_RENDER_COUNT;
+                        const moreBtn = document.createElement('button');
+                        moreBtn.className = 'big-btn ghost sm';
+                        moreBtn.style.cssText = 'width:100%; margin-top:4px; padding:10px; border:1px dashed #cbd5e1; background:#fff; border-radius:8px; color:#2563eb; font-weight:bold; cursor:pointer;';
+                        moreBtn.textContent = `더보기 (${remaining}개 더)`;
+                        moreBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            storeList.slice(INITIAL_RENDER_COUNT).forEach((store) => {
+                                contentDiv.insertBefore(buildCard(store), moreBtn);
+                            });
+                            moreBtn.remove();
+                        };
+                        contentDiv.appendChild(moreBtn);
+                    }
                     listContainer.appendChild(section);
                 }
                 if (totalCount === 0) listContainer.innerHTML = '<p style="text-align: center; color: #888; margin-top: 30px;">반경 내 음식점이 없습니다.</p>';
@@ -954,6 +1121,7 @@ const response = await fetch(analysisApiUrl, {
 
                 const contentDiv = document.createElement('div');
                 contentDiv.className = 'group-content';
+                const newMarkers = [];
 
                 wishlist.forEach(key => {
                     let store = currentStores.find(s => getStoreKey(s) === key) || { bizesId: key, bizesNm: key.split('_')[0], rdnmAdr: '주소 정보 없음', lat: centerLat, lon: centerLng, distanceMeters: 0 };
@@ -965,9 +1133,10 @@ const response = await fetch(analysisApiUrl, {
 
                     if (!isNaN(sLat) && !isNaN(sLon)) {
                         const pos = { lat: sLat, lng: sLon };
-                        const marker = new google.maps.Marker({ position: pos, map: map });
+                        const marker = new google.maps.Marker({ position: pos, map: mapClusterer ? null : map });
                         marker.addListener('click', () => createCustomPopup(store, pos));
                         currentMarkers.push({ marker, store });
+                        newMarkers.push(marker);
                     }
 
                     const card = document.createElement('div');
@@ -989,6 +1158,9 @@ const response = await fetch(analysisApiUrl, {
                     };
                     contentDiv.appendChild(card);
                 });
+                if (mapClusterer && newMarkers.length > 0) {
+                    mapClusterer.addMarkers(newMarkers);
+                }
 
                 const section = document.createElement('div');
                 section.className = 'group-section';
@@ -997,23 +1169,172 @@ const response = await fetch(analysisApiUrl, {
                 listContainer.appendChild(section);
             }
 
-            async function loadStores(lat, lng) {
-                if (isWishlistMode) return; 
-                try {
-                    let response;
-                    try { response = await fetch(`/api/stores/radius?cx=${lng}&cy=${lat}&radius=${radius}`); }
-                    catch (e) { response = await fetch(`http://localhost:3000/api/stores/radius?cx=${lng}&cy=${lat}&radius=${radius}`); }
-                    
-                    const data = await response.json();
-                    let items = data?.body?.items || (Array.isArray(data) ? data : (data ? [data] : []));
-                    currentStores = items.filter(s => getFoodCategory(s.indsSclsNm, s.indsLclsNm, s.bizesNm) !== null);
+            let storesLoadInProgress = false;
+            let pendingStoresLoad = null;
+            let storesLoadToken = 0; // 이 값이 바뀌면 이전 백그라운드 로딩은 중단(무시)한다
 
-                    const searchKeywordEl = document.getElementById('search-keyword');
-                    if (searchKeywordEl) searchKeywordEl.value = '';
-                    renderStores(currentStores);
+            const MAX_TOTAL_FETCH = 3000; // 체감 속도를 위한 상한 (그 이상은 반경을 줄이도록 안내)
+            const BG_PAGE_DELAY_MS = 250;
+            const PREVIEW_SIZE = 30; // "미리보기" 요청 건수 — 작을수록 응답이 빠르다
+
+            function showGuideMessage(html) {
+                const guideEl = document.getElementById('guide-text-msg');
+                if (guideEl) guideEl.innerHTML = html;
+            }
+
+            function showLoadingSpinner() {
+                const listContainer = document.getElementById('store-list-container');
+                if (listContainer) {
+                    listContainer.innerHTML = `
+                        <div style="text-align:center; padding:40px 0; color:#64748b;">
+                            <div class="spinner" style="width:32px; height:32px; border:3px solid #e2e8f0; border-top-color:#2563eb; border-radius:50%; margin:0 auto 12px; animation:spin 0.7s linear infinite;"></div>
+                            <div style="font-size:13px;">불러오는 중...</div>
+                        </div>
+                        <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
+                    `;
+                }
+            }
+
+            async function fetchStorePage(lat, lng, pageNo, useFilterParam, numOfRows) {
+                const qs = new URLSearchParams({ cx: lng, cy: lat, radius, pageNo, useFilter: useFilterParam });
+                if (numOfRows) qs.set('numOfRows', numOfRows);
+                const response = await fetch(`/api/stores/radius?${qs.toString()}`);
+                const data = await response.json();
+                if (!response.ok || data.success === false) {
+                    const detail = data.apiHeader
+                        ? `resultCode: ${data.apiHeader.resultCode} / ${data.apiHeader.resultMsg}`
+                        : (data.error || data.message || '알 수 없는 오류');
+                    const err = new Error(detail);
+                    err.isApiError = true;
+                    err.detail = detail;
+                    throw err;
+                }
+                return data;
+            }
+
+            function mergeAndRenderStores(rawItems) {
+                window.__lastRawItems = rawItems;
+                window.__debugFindStore = function (nameKeyword) {
+                    const found = rawItems.filter(it => (it.bizesNm || '').replace(/\s/g, '').includes(nameKeyword.replace(/\s/g, '')));
+                    if (found.length === 0) {
+                        console.log(`[진단] "${nameKeyword}"를 포함한 업소가 지금까지 불러온 데이터에 없습니다.`);
+                    } else {
+                        found.forEach(it => {
+                            const cat = getFoodCategory(it.indsSclsNm, it.indsLclsNm, it.bizesNm, it.indsMclsNm);
+                            console.log(`[진단] "${it.bizesNm}" 원본:`, it, `\n→ 필터 결과: ${cat === null ? '❌ 제외됨' : '✅ 포함됨 (' + cat + ')'}`);
+                        });
+                    }
+                    return found;
+                };
+                currentStores = rawItems.filter(s => getFoodCategory(s.indsSclsNm, s.indsLclsNm, s.bizesNm, s.indsMclsNm) !== null);
+                renderStores(currentStores);
+            }
+
+            // 화면이 오래 하얗게 비어있지 않도록, 먼저 아주 작은 "미리보기"(30건)를 빠르게 받아서
+            // 즉시 뭐라도 보여준다. 그다음 정식 페이지네이션(500건 단위)으로 전체를 채운다.
+            // 건수가 적을수록 공공데이터 서버의 응답 자체도 더 빨리 오는 경향이 있다.
+            async function loadStores(lat, lng) {
+                if (isWishlistMode) return;
+                if (storesLoadInProgress) {
+                    pendingStoresLoad = { lat, lng };
+                    return;
+                }
+                storesLoadInProgress = true;
+                const myToken = ++storesLoadToken;
+
+                const searchKeywordEl = document.getElementById('search-keyword');
+                if (searchKeywordEl) searchKeywordEl.value = '';
+
+                showLoadingSpinner();
+                showGuideMessage('🔄 불러오는 중...');
+
+                try {
+                    // 0단계: 미리보기 (작은 건수라 빠르게 옴). 실패해도 조용히 넘어가고 본 조회로 진행한다.
+                    let usedFilterHint = 'auto';
+                    try {
+                        const preview = await fetchStorePage(lat, lng, 1, 'auto', PREVIEW_SIZE);
+                        if (myToken !== storesLoadToken) return;
+                        const previewItems = preview.body.items || [];
+                        usedFilterHint = preview.body.usedFilter ? '1' : '0';
+                        if (previewItems.length > 0) {
+                            console.log(`[진단] 미리보기 도착: ${previewItems.length}건 (즉시 표시)`);
+                            mergeAndRenderStores(previewItems);
+                            showGuideMessage('🔄 나머지 불러오는 중...');
+                        }
+                    } catch (err) {
+                        console.warn('⚠️ 미리보기 실패, 본 조회로 바로 진행:', err.detail || err.message);
+                    }
+                    if (myToken !== storesLoadToken) return;
+
+                    // 1단계: 정식 1페이지 (미리보기에서 필터 적용 여부를 확인했으면 그대로 재사용해서
+                    // 서버가 다시 판단하지 않아도 되게 한다 = 한 템포 더 빠름)
+                    let firstPage;
+                    try {
+                        firstPage = await fetchStorePage(lat, lng, 1, usedFilterHint);
+                    } catch (err) {
+                        console.error('❌ [상점 조회 실패]', err.detail || err.message);
+                        showGuideMessage(`⚠️ 데이터를 불러오지 못했습니다: ${err.detail || err.message}`);
+                        currentStores = [];
+                        renderStores(currentStores);
+                        return;
+                    }
+                    if (myToken !== storesLoadToken) return;
+
+                    let allItems = firstPage.body.items || [];
+                    const totalCount = firstPage.body.totalCount || allItems.length;
+                    const usedFilter = firstPage.body.usedFilter;
+                    let hasMore = firstPage.body.hasMore;
+
+                    console.log(`[진단] 1페이지 도착: ${allItems.length}건 (전체 ${totalCount}건, 서버 업종필터: ${usedFilter ? '적용됨' : '미적용'})`);
+
+                    mergeAndRenderStores(allItems);
+
+                    if (hasMore && totalCount > allItems.length) {
+                        showGuideMessage(`🔄 더 불러오는 중... (${allItems.length}/${Math.min(totalCount, MAX_TOTAL_FETCH)}건)`);
+                    }
+
+                    // 나머지 페이지는 뒤에서 계속 이어받는다. 그 사이 사용자가 다른 곳을 클릭/줌하면
+                    // storesLoadToken이 바뀌어서 이 루프는 스스로 멈춘다 (낡은 응답이 화면을 덮어쓰지 않게).
+                    let pageNo = 1;
+                    const filterFlag = usedFilter ? '1' : '0';
+                    while (hasMore && allItems.length < MAX_TOTAL_FETCH) {
+                        if (myToken !== storesLoadToken) return; // 더 최신 요청이 시작됐으면 중단
+                        await new Promise((r) => setTimeout(r, BG_PAGE_DELAY_MS));
+                        pageNo++;
+                        let nextPage;
+                        try {
+                            nextPage = await fetchStorePage(lat, lng, pageNo, filterFlag);
+                        } catch (err) {
+                            console.warn('⚠️ 백그라운드 페이지 로딩 중단:', err.detail || err.message);
+                            break;
+                        }
+                        if (myToken !== storesLoadToken) return;
+
+                        allItems = allItems.concat(nextPage.body.items || []);
+                        hasMore = nextPage.body.hasMore;
+                        mergeAndRenderStores(allItems);
+                        showGuideMessage(hasMore && allItems.length < MAX_TOTAL_FETCH
+                            ? `🔄 더 불러오는 중... (${allItems.length}/${Math.min(totalCount, MAX_TOTAL_FETCH)}건)`
+                            : `📍 현재 위치 기준 반경 <strong>${rangeStrFromRadius(radius)}</strong> 내 음식점 ${allItems.length}건`);
+                    }
+
+                    if (allItems.length >= MAX_TOTAL_FETCH && totalCount > allItems.length) {
+                        showGuideMessage(`⚠️ 업소가 너무 많아 ${MAX_TOTAL_FETCH}건까지만 표시했습니다 (전체 ${totalCount}건). 반경을 줄이면 더 정확합니다.`);
+                    }
                 } catch (error) {
                     console.error('데이터 로드 실패:', error);
+                } finally {
+                    if (myToken === storesLoadToken) storesLoadInProgress = false;
+                    if (pendingStoresLoad) {
+                        const next = pendingStoresLoad;
+                        pendingStoresLoad = null;
+                        loadStores(next.lat, next.lng);
+                    }
                 }
+            }
+
+            function rangeStrFromRadius(r) {
+                return r >= 1000 ? (r / 1000) + 'km' : r + 'm';
             }
 
             function filterStores() {
@@ -1062,13 +1383,30 @@ const response = await fetch(analysisApiUrl, {
                 );
             };
 
+            let zoomChangeTimer = null;
             map.addListener('zoom_changed', () => {
                 const newZoom = map.getZoom();
                 if (newZoom !== currentZoom) {
                     currentZoom = newZoom;
                     radius = getRadiusByZoom(currentZoom);
+
+                    // 클러스터 숫자를 클릭했을 때만 검색 중심을 지도의 새 중심으로 옮긴다.
+                    // 마우스 휠/핀치로 직접 줌인·아웃할 때는 구글맵이 커서 위치 쪽으로 살짝 이동시키는데,
+                    // 여기서 좌표를 매번 다시 맞추면 "처음 찍은 위치가 계속 움직이는" 것처럼 보이게 된다.
+                    // 그래서 이 경우엔 currentLat/currentLng를 그대로 고정해서 처음 찍은 위치가 유지되게 한다.
+                    if (clusterZoomPending) {
+                        const center = map.getCenter();
+                        if (center) {
+                            currentLat = center.lat();
+                            currentLng = center.lng();
+                        }
+                    }
+
                     updateCenterMarker({ lat: currentLat, lng: currentLng });
-                    loadStores(currentLat, currentLng);
+                    // 줌을 빠르게 여러 번 바꿔도 요청은 마지막 한 번만 나가도록 디바운스
+                    // (공공데이터 API의 초당 요청 제한에 걸리지 않기 위함)
+                    clearTimeout(zoomChangeTimer);
+                    zoomChangeTimer = setTimeout(() => loadStores(currentLat, currentLng), 400);
                 }
             });
 
