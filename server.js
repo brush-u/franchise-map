@@ -79,8 +79,12 @@ app.get('/api/stores/radius', async (req, res) => {
   }
 });
 
-// 서버 실행
+// 기존 코드 예시 (수정 전)
+// const PORT = 3000;
+
+// 수정 후 (환경 변수 PORT 지원)
 const PORT = process.env.PORT || 3000;
+
 app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+  console.log(`Server is running on port ${PORT}`);
 });
