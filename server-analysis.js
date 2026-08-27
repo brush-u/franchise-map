@@ -5,7 +5,11 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const PORT = 3001;
+// [수정 전 예시]
+// const PORT = 3001; 
+
+// [수정 후: 웹 클라우드 배포 환경 대응]
+const PORT = process.env.ANALYSIS_PORT || process.env.PORT || 3001;
 
 app.post('/api/v1/analysis/execute', async (req, res) => {
   try {
