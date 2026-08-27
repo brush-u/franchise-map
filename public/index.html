@@ -598,6 +598,8 @@
             let startY = 0;
             let startHeight = 0;
             let isDragging = false;
+            let listTouchStartY = 0;
+            let listDragCandidate = false; // 리스트 맨 위에서 touchstart 했는지 여부
 
             function onDragStart(clientY) {
                 if (window.innerWidth > 768) return;
@@ -625,6 +627,8 @@
                 sidebar.style.transition = 'height 0.3s cubic-bezier(0.25, 1, 0.5, 1)';
             }
 
+            // 상단 손잡이(얇은 바)뿐 아니라 헤더 영역 전체를 잡아도 드래그되게 한다 —
+            // 손잡이만 있으면 손가락으로 정확히 맞추기 어렵다는 피드백 반영.
             dragHandle.addEventListener('mousedown', (e) => onDragStart(e.clientY));
             window.addEventListener('mousemove', (e) => onDragMove(e.clientY));
             window.addEventListener('mouseup', onDragEnd);
@@ -632,6 +636,49 @@
             dragHandle.addEventListener('touchstart', (e) => onDragStart(e.touches[0].clientY), { passive: true });
             window.addEventListener('touchmove', (e) => onDragMove(e.touches[0].clientY), { passive: true });
             window.addEventListener('touchend', onDragEnd, { passive: true });
+
+            if (sidebarHeader) {
+                sidebarHeader.addEventListener('touchstart', (e) => onDragStart(e.touches[0].clientY), { passive: true });
+            }
+
+            // ── 리스트 내부에서도 드래그 가능하게 (구글맵 방식) ──
+            // 리스트가 맨 위(scrollTop === 0)로 스크롤된 상태에서 아래로 당기면 시트를 움직이고,
+            // 그 외(이미 스크롤된 상태, 또는 위로 미는 동작)에는 리스트가 평소대로 스크롤된다.
+            // 이러면 "목록 안 아무 곳이나 잡고 시트를 움직이는" 구글맵 느낌을 그대로 낼 수 있다.
+            const storeListEl = document.getElementById('store-list-container');
+            if (storeListEl) {
+                storeListEl.addEventListener('touchstart', (e) => {
+                    if (window.innerWidth > 768) return;
+                    listTouchStartY = e.touches[0].clientY;
+                    listDragCandidate = storeListEl.scrollTop <= 0;
+                }, { passive: true });
+
+                storeListEl.addEventListener('touchmove', (e) => {
+                    if (window.innerWidth > 768 || !listDragCandidate) return;
+                    const currentY = e.touches[0].clientY;
+                    const pulledDown = currentY - listTouchStartY;
+
+                    if (!isDragging && pulledDown > 6 && storeListEl.scrollTop <= 0) {
+                        // 리스트 맨 위에서 아래로 당기기 시작 -> 시트 드래그로 전환
+                        onDragStart(listTouchStartY);
+                    }
+                    if (isDragging) {
+                        // 시트를 움직이는 동안엔 리스트 자체의 오버스크롤 바운스가 같이 일어나면
+                        // 어색해 보이므로 기본 스크롤 동작은 막는다.
+                        e.preventDefault();
+                        onDragMove(currentY);
+                    } else {
+                        // 위로 미는 동작이거나 이미 스크롤 중이면 리스트 자체 스크롤에 맡긴다
+                        listDragCandidate = storeListEl.scrollTop <= 0;
+                    }
+                }, { passive: false });
+
+                storeListEl.addEventListener('touchend', () => {
+                    listDragCandidate = false;
+                    onDragEnd();
+                }, { passive: true });
+            }
+
 
             const statusMsg = document.getElementById('status-msg');
             if (typeof google === 'undefined' || !google.maps) {
