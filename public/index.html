@@ -24,9 +24,11 @@
             bottom: 0;
             left: 0;
             width: 100%;
-            height: 40vh;
-            max-height: 90vh;
-            min-height: 10vh;
+            /* 예전엔 드래그할 때마다 height를 직접 바꿔서, 매 프레임 레이아웃 재계산(reflow)이
+               일어나 무겁고 딱딱하게 느껴졌다. 이제는 시트 크기(height)는 항상 92vh로 고정해두고,
+               transform(translateY)만으로 보이는 위치를 옮긴다. transform은 GPU 합성(compositing)만
+               일어나고 레이아웃 재계산이 없어서 훨씬 가볍고 부드럽다 (구글맵과 같은 방식). */
+            height: 92vh;
             background: #ffffff;
             border-top: 1px solid #e2e8f0;
             border-top-left-radius: 24px;
@@ -35,7 +37,9 @@
             z-index: 1000;
             display: flex;
             flex-direction: column;
-            transition: height 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+            transform: translateY(52vh); /* 기본값: 92vh 중 40vh만 보이도록 나머지를 화면 아래로 내림 */
+            transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+            will-change: transform;
         }
         
         .mode-tabs-container {
@@ -271,6 +275,7 @@
                 width: 380px;
                 flex: none;
                 height: 100% !important;
+                transform: none !important;
                 border-top: none;
                 border-left: 1px solid #e2e8f0;
                 border-radius: 0;
@@ -578,13 +583,23 @@
                 });
             }
 
-            const heights = ['12vh', '40vh', '88vh'];
+            // 시트 실제 크기(height)는 항상 92vh로 고정. "몇 vh만큼 보이게 할지"만 계산해서
+            // translateY로 옮긴다. visibleVh가 클수록(=시트를 많이 펼칠수록) translateY는 작아진다.
+            const SHEET_HEIGHT_VH = 92;
+            const MIN_VISIBLE_VH = 10;
+            const MAX_VISIBLE_VH = 92;
+
+            function visibleVhToTranslateY(visibleVh) {
+                return (SHEET_HEIGHT_VH - visibleVh) + 'vh';
+            }
+
+            const peekLevelsVh = [12, 40, 88];
             let currentHeightIndex = 1;
 
             function toggleWindowSize() {
                 if (window.innerWidth <= 768) {
-                    currentHeightIndex = (currentHeightIndex + 1) % heights.length;
-                    sidebar.style.height = heights[currentHeightIndex];
+                    currentHeightIndex = (currentHeightIndex + 1) % peekLevelsVh.length;
+                    sidebar.style.transform = `translateY(${visibleVhToTranslateY(peekLevelsVh[currentHeightIndex])})`;
                     sizeToggleArrowBtn.textContent = (currentHeightIndex === 2) ? '▼' : '▲';
                 }
             }
@@ -599,34 +614,54 @@
             }
 
             let startY = 0;
-            let startHeight = 0;
+            let startTranslatePx = 0;
             let isDragging = false;
             let listDragCandidate = false; // 리스트 맨 위에서 touchstart 했는지 여부
+
+            function getCurrentTranslatePx() {
+                // 현재 적용된 transform 값을 px 단위로 읽어온다 (transition 중이어도 현재 렌더링된 값 그대로)
+                const style = window.getComputedStyle(sidebar);
+                const matrix = style.transform;
+                if (matrix && matrix !== 'none') {
+                    const match = matrix.match(/matrix\(([^)]+)\)/);
+                    if (match) {
+                        const parts = match[1].split(',').map(parseFloat);
+                        return parts[5] || 0; // translateY는 matrix의 6번째 값
+                    }
+                }
+                return 0;
+            }
 
             function onDragStart(clientY) {
                 if (window.innerWidth > 768) return;
                 isDragging = true;
                 startY = clientY;
-                startHeight = sidebar.offsetHeight;
+                startTranslatePx = getCurrentTranslatePx();
+                // 드래그 중엔 transition을 끈다 — 손가락을 그대로 즉시 따라가야 자연스럽다.
+                // (transition이 걸린 채로 값을 계속 바꾸면 매 프레임 애니메이션이 밀려서 무겁게 느껴진다)
                 sidebar.style.transition = 'none';
             }
 
             function onDragMove(clientY) {
                 if (!isDragging) return;
-                const deltaY = startY - clientY;
-                const newHeight = startHeight + deltaY;
-                const maxHeight = window.innerHeight * 0.92;
-                const minHeight = window.innerHeight * 0.1;
-                
-                if (newHeight >= minHeight && newHeight <= maxHeight) {
-                    sidebar.style.height = `${newHeight}px`;
-                }
+                const deltaY = clientY - startY; // 손가락이 아래로 내려간 만큼 시트도 아래로
+                let newTranslatePx = startTranslatePx + deltaY;
+
+                const maxVisiblePx = window.innerHeight * (MAX_VISIBLE_VH / 100);
+                const minVisiblePx = window.innerHeight * (MIN_VISIBLE_VH / 100);
+                const sheetHeightPx = window.innerHeight * (SHEET_HEIGHT_VH / 100);
+                const minTranslate = sheetHeightPx - maxVisiblePx; // 완전히 펼쳤을 때
+                const maxTranslate = sheetHeightPx - minVisiblePx; // 거의 접었을 때
+
+                newTranslatePx = Math.min(maxTranslate, Math.max(minTranslate, newTranslatePx));
+                // height가 아니라 transform만 바꾸므로 레이아웃 재계산 없이 GPU 합성만 일어난다 (가볍다).
+                sidebar.style.transform = `translateY(${newTranslatePx}px)`;
             }
 
             function onDragEnd() {
                 if (!isDragging) return;
                 isDragging = false;
-                sidebar.style.transition = 'height 0.3s cubic-bezier(0.25, 1, 0.5, 1)';
+                sidebar.style.transition = 'transform 0.3s cubic-bezier(0.25, 1, 0.5, 1)';
             }
 
             // 상단 손잡이(얇은 바)뿐 아니라 헤더 영역 전체를 잡아도 드래그되게 한다 —
@@ -664,7 +699,10 @@
 
                 storeListEl.addEventListener('touchstart', (e) => {
                     if (window.innerWidth > 768) return;
-                    const nearlyMaxed = sidebar.offsetHeight >= window.innerHeight * 0.85;
+                    // 시트 자체 높이(offsetHeight)는 이제 항상 92vh로 고정이라 "얼마나 펼쳐졌는지"를
+                    // 알 수 없다. 실제 보이는 정도는 translateY 값으로 판단해야 한다.
+                    const currentTranslatePx = getCurrentTranslatePx();
+                    const nearlyMaxed = currentTranslatePx <= window.innerHeight * 0.05; // 거의 0에 가까우면 = 거의 다 펼쳐진 상태
                     listDragCandidate = storeListEl.scrollTop <= 1 && !nearlyMaxed;
                     if (listDragCandidate) {
                         onDragStart(e.touches[0].clientY);
@@ -1461,7 +1499,8 @@
 
             map.addListener('click', (e) => {
                 if (window.innerWidth <= 768) {
-                    sidebar.style.height = heights[0];
+                    sidebar.style.transition = 'transform 0.3s cubic-bezier(0.25, 1, 0.5, 1)';
+                    sidebar.style.transform = `translateY(${visibleVhToTranslateY(peekLevelsVh[0])})`;
                     currentHeightIndex = 0;
                     sizeToggleArrowBtn.textContent = '▲';
                 }
