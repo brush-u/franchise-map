@@ -4,32 +4,92 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>뭐 먹지? 근처 맛집 찾기</title>
-    <!-- 카카오 지도 SDK (services 라이브러리 포함) -->
-    <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=__KAKAO_API_KEY__&libraries=services"></script>
+    <!-- 구글 맵 API 로드 -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDfrimvyT5Z_mB64ljqmURgJgqbqhi7t88&libraries=places"></script>
     <style>
-        body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; display: flex; height: 100vh; overflow: hidden; background: #000; }
+        body { margin: 0; padding: 0; font-family: 'Malgun Gothic', sans-serif; display: flex; height: 100vh; overflow: hidden; }
         #map { flex: 2; height: 100%; position: relative; }
-        #sidebar { flex: 1; height: 100%; background: #121212; color: #fff; border-left: 1px solid #2a2a2a; display: flex; flex-direction: column; }
         
-        .sidebar-header { padding: 15px 20px; background: #1e1e1e; color: white; font-size: 16px; font-weight: bold; display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; border-bottom: 1px solid #2a2a2a; }
+        #sidebar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 40vh;
+            max-height: 90vh;
+            min-height: 10vh;
+            background: #f8f9fa;
+            border-top: 1px solid #ddd;
+            border-top-left-radius: 20px;
+            border-top-right-radius: 20px;
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            transition: height 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+        }
         
-        .header-btn-wrap { display: flex; gap: 6px; }
-        .global-toggle-btn, .wishlist-tab-btn { background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); color: white; padding: 4px 8px; font-size: 12px; border-radius: 4px; cursor: pointer; font-weight: normal; }
-        .global-toggle-btn:hover, .wishlist-tab-btn:hover { background: rgba(255, 255, 255, 0.2); }
-        .wishlist-tab-btn.active { background: #0066ff; color: white; font-weight: bold; border-color: #0066ff; }
+        .sidebar-header {
+            width: 100%;
+            padding: 10px 20px 12px 20px;
+            background: #0066ff;
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            user-select: none;
+            border-top-left-radius: 20px;
+            border-top-right-radius: 20px;
+            flex-shrink: 0;
+            box-sizing: border-box;
+        }
 
-        .mobile-handle-bar { display: none; width: 100%; height: 28px; background: #1e1e1e; align-items: center; justify-content: center; cursor: grab; border-top: 1px solid #2a2a2a; border-radius: 20px 20px 0 0; user-select: none; touch-action: none; flex-shrink: 0; }
-        .mobile-handle-bar:active { cursor: grabbing; }
-        .mobile-handle { width: 36px; height: 4px; background: #555; border-radius: 2px; }
+        .handle-indicator-wrap {
+            width: 100%;
+            background: #f8f9fa;
+            border-top-left-radius: 20px;
+            border-top-right-radius: 20px;
+            padding-top: 8px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .mobile-handle { width: 48px; height: 5px; background: #cbd5e1; border-radius: 3px; }
+        
+        .header-btn-wrap { display: flex; gap: 6px; align-items: center; }
+        .global-toggle-btn, .wishlist-tab-btn { background: rgba(255, 255, 255, 0.2); border: 1px solid rgba(255, 255, 255, 0.4); color: white; padding: 4px 8px; font-size: 12px; border-radius: 4px; cursor: pointer; font-weight: normal; }
+        .global-toggle-btn:hover, .wishlist-tab-btn:hover { background: rgba(255, 255, 255, 0.3); }
+        .wishlist-tab-btn.active { background: white; color: #0066ff; font-weight: bold; border-color: white; }
 
-        .search-control-container { padding: 10px 15px; background: #181818; border-bottom: 1px solid #2a2a2a; display: flex; flex-direction: column; gap: 8px; }
-        .search-row { display: flex; gap: 8px; align-items: center; }
-        .search-input { flex: 1; padding: 8px 12px; border: 1px solid #333; background: #222; color: #fff; border-radius: 6px; font-size: 14px; outline: none; }
+        .size-toggle-arrow-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            color: white;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        .size-toggle-arrow-btn:hover { background: rgba(255, 255, 255, 0.4); }
+
+        .search-control-container { padding: 10px 15px; background: #ffffff; border-bottom: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+        .search-row { display: flex; gap: 6px; align-items: center; }
+        .search-input { flex: 1; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; outline: none; }
         .search-input:focus { border-color: #0066ff; }
         
-        .map-selector { padding: 8px 10px; font-size: 13px; border-radius: 6px; border: 1px solid #333; background: #222; color: #60a5fa; font-weight: bold; cursor: pointer; outline: none; width: 105px; }
+        .map-selector { padding: 8px 6px; font-size: 12px; border-radius: 6px; border: 1px solid #cbd5e1; background: #f8f9fa; color: #333; font-weight: bold; cursor: pointer; outline: none; display: inline-block; width: 95px; }
         
-        .search-btn { padding: 8px 14px; background: #0066ff; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
+        .search-btn { padding: 8px 12px; background: #0066ff; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
         .search-btn:hover { background: #0052cc; }
 
         .geolocation-btn {
@@ -37,14 +97,14 @@
             top: 20px;
             right: 20px;
             z-index: 5;
-            background: #1e1e1e;
-            border: 1px solid #333;
+            background: white;
+            border: 1px solid #cbd5e1;
             padding: 8px 14px;
-            border-radius: 20px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            border-radius: 6px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
             font-weight: bold;
             font-size: 13px;
-            color: #fff;
+            color: #333;
             cursor: pointer;
             display: flex;
             align-items: center;
@@ -53,73 +113,85 @@
             transition: 0.2s;
         }
         .geolocation-btn:hover {
-            background: #2a2a2a;
+            background: #f1f5f9;
+            color: #0066ff;
             border-color: #0066ff;
         }
 
-        .store-list { flex: 1; overflow-y: auto; padding: 15px; background: #121212; }
+        .store-list { flex: 1; overflow-y: auto; padding: 15px; background: #f8f9fa; -webkit-overflow-scrolling: touch; }
         
         .group-section { margin-bottom: 20px; }
-        .group-title { font-size: 14px; font-weight: bold; color: #aaa; margin-bottom: 10px; padding-bottom: 5px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; }
-        .group-title:hover { color: #fff; }
+        .group-title { font-size: 15px; font-weight: bold; color: #333; margin-bottom: 10px; padding-bottom: 5px; border-bottom: 2px solid #0066ff; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; }
+        .group-title:hover { color: #0066ff; }
         .group-count-wrap { display: flex; align-items: center; gap: 8px; }
-        .group-count { background: #333; color: #fff; font-size: 11px; padding: 2px 6px; border-radius: 10px; }
-        .toggle-icon { font-size: 12px; color: #888; transition: transform 0.2s; }
+        .group-count { background: #0066ff; color: white; font-size: 11px; padding: 2px 6px; border-radius: 10px; }
+        .toggle-icon { font-size: 12px; color: #666; transition: transform 0.2s; }
         
-        .group-content { display: flex; flex-direction: column; gap: 10px; transition: all 0.3s ease; }
+        .group-content { display: flex; flex-direction: column; gap: 8px; transition: all 0.3s ease; }
         .group-content.collapsed { display: none; }
 
-        .store-card { background: #1a1a1a; padding: 16px; border-radius: 12px; border: 1px solid #2a2a2a; box-shadow: 0 4px 10px rgba(0,0,0,0.2); cursor: pointer; transition: 0.2s; position: relative; }
-        .store-card:hover { background: #222; border-color: #444; transform: translateY(-2px); }
-        .store-card.selected { background: #1c2638; border-color: #0066ff; }
+        .store-card { background: white; padding: 12px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); cursor: pointer; transition: 0.2s; border-left: 4px solid #0066ff; position: relative; }
+        .store-card:hover { background: #f1f5f9; transform: translateY(-2px); }
+        .store-card.selected { background: #e0f2fe; border-left-color: #0284c7; }
         
-        .native-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
-        .store-name { font-size: 16px; font-weight: bold; color: #fff; display: flex; align-items: center; gap: 6px; }
+        .store-name { font-size: 15px; font-weight: bold; color: #111; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; }
+        .store-name a { color: #0066ff; text-decoration: none; }
+        .store-name a:hover { text-decoration: underline; }
+        .store-info { font-size: 12px; color: #555; margin-bottom: 2px; }
+        .store-category { font-size: 11px; color: #0066ff; font-weight: bold; margin-top: 4px; }
         
         .rating-badge {
-            color: #fbbf24;
-            font-size: 13px;
+            background: #fff8e1;
+            color: #f59e0b;
+            border: 1px solid #fde68a;
+            font-size: 11px;
             font-weight: bold;
+            padding: 1px 6px;
+            border-radius: 10px;
             display: inline-flex;
             align-items: center;
-            gap: 2px;
+            gap: 3px;
+            margin-left: 6px;
+            vertical-align: middle;
         }
-        .review-count { color: #888; font-weight: normal; font-size: 12px; }
 
-        .store-sub-info { font-size: 12px; color: #aaa; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
-        .store-status-row { font-size: 12px; margin: 8px 0 12px 0; display: flex; align-items: center; justify-content: space-between; }
-        .status-open { color: #22c55e; font-weight: bold; }
-
-        .native-action-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; border-top: 1px solid #2a2a2a; padding-top: 12px; margin-top: 8px; }
-        .native-action-btn { background: #252525; border: 1px solid #333; color: #fff; padding: 8px 0; border-radius: 20px; font-size: 12px; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 4px; cursor: pointer; text-decoration: none; transition: 0.15s; }
-        .native-action-btn:hover { background: #0066ff; border-color: #0066ff; }
-
-        .wish-btn { background: transparent; border: none; font-size: 18px; cursor: pointer; padding: 0; transition: transform 0.1s; }
+        .wish-btn {
+            background: transparent;
+            border: none;
+            font-size: 16px;
+            cursor: pointer;
+            padding: 2px 4px;
+            transition: transform 0.1s;
+        }
         .wish-btn:active { transform: scale(1.25); }
 
-        .guide-text { padding: 8px 15px; background: #162032; color: #60a5fa; font-size: 12px; border-bottom: 1px solid #1e3a8a; line-height: 1.4; }
+        .guide-text { padding: 8px 15px; background: #e0f2fe; color: #0369a1; font-size: 12px; border-bottom: 1px solid #bae6fd; line-height: 1.4; flex-shrink: 0; }
 
-        @media (max-width: 768px) {
-            body { flex-direction: column; height: 100vh; position: relative; }
-            #map { width: 100%; height: 100%; flex: none; position: absolute; top: 0; left: 0; z-index: 1; }
-            .geolocation-btn { top: 15px; right: 15px; padding: 6px 12px; font-size: 12px; }
-            #sidebar { 
-                position: absolute; bottom: 0; left: 0; width: 100%; height: 42vh; z-index: 10; 
-                border-left: none; border-top: 1px solid #2a2a2a; box-shadow: 0 -8px 24px rgba(0,0,0,0.5);
-                border-radius: 20px 20px 0 0; transition: height 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+        @media (min-width: 769px) {
+            #sidebar {
+                position: relative;
+                width: auto;
+                height: 100% !important;
+                flex: 1;
+                border-top: none;
+                border-left: 1px solid #ddd;
+                border-radius: 0;
             }
-            .mobile-handle-bar { display: flex; }
+            .sidebar-header { border-radius: 0; }
+            .handle-indicator-wrap { display: none; }
         }
     </style>
 </head>
 <body>
 
     <div id="map">
-        <button id="current-location-btn" class="geolocation-btn">📍 내 위치</button>
+        <button id="current-location-btn" class="geolocation-btn">
+            📍 내 위치로 이동
+        </button>
     </div>
 
     <div id="sidebar">
-        <div class="mobile-handle-bar" id="drag-handle">
+        <div class="handle-indicator-wrap" id="drag-handle">
             <div class="mobile-handle"></div>
         </div>
 
@@ -128,6 +200,7 @@
             <div class="header-btn-wrap" onclick="event.stopPropagation();">
                 <button id="wishlist-tab-btn" class="wishlist-tab-btn">❤️ 찜 (0)</button>
                 <button id="global-toggle-btn" class="global-toggle-btn">모두 접기</button>
+                <button id="size-toggle-arrow-btn" class="size-toggle-arrow-btn" title="창 크기 변경">▲</button>
             </div>
         </div>
         <div class="guide-text" id="guide-text-msg">💡 지도를 클릭하거나 위치를 이동하여 중심점을 지정하세요.</div>
@@ -135,9 +208,9 @@
         <div class="search-control-container">
             <div class="search-row">
                 <select id="map-platform-select" class="map-selector">
-                    <option value="google">구글 맵</option>
-                    <option value="kakao">카카오맵</option>
-                    <option value="naver">네이버 지도</option>
+                    <option value="google">구글맵</option>
+                    <option value="naver">네이버맵</option>
+                    <option value="kakao" selected>카카오맵</option>
                 </select>
                 <input type="text" id="search-keyword" class="search-input" placeholder="음식점 이름 또는 업종 검색">
                 <button id="search-btn" class="search-btn">찾기</button>
@@ -155,109 +228,115 @@
             const mapContainer = document.getElementById('map');
             const dragHandle = document.getElementById('drag-handle');
             const sidebarHeader = document.getElementById('sidebar-header-toggle');
+            const sizeToggleArrowBtn = document.getElementById('size-toggle-arrow-btn');
+
+            const heights = ['12vh', '40vh', '88vh'];
+            let currentHeightIndex = 1;
+
+            function toggleWindowSize() {
+                if (window.innerWidth <= 768) {
+                    currentHeightIndex = (currentHeightIndex + 1) % heights.length;
+                    sidebar.style.height = heights[currentHeightIndex];
+                    
+                    if (currentHeightIndex === 2) {
+                        sizeToggleArrowBtn.textContent = '▼';
+                    } else {
+                        sizeToggleArrowBtn.textContent = '▲';
+                    }
+                }
+            }
+
+            if (dragHandle) dragHandle.onclick = toggleWindowSize;
+            if (sidebarHeader) sidebarHeader.onclick = toggleWindowSize;
+            if (sizeToggleArrowBtn) {
+                sizeToggleArrowBtn.onclick = function(e) {
+                    e.stopPropagation();
+                    toggleWindowSize();
+                };
+            }
 
             let startY = 0;
             let startHeight = 0;
-            
-            const getHeights = () => ({
-                peek: window.innerHeight * 0.12,
-                half: window.innerHeight * 0.42,
-                full: window.innerHeight * 0.88
-            });
+            let isDragging = false;
 
-            function setSidebarHeight(h) {
-                if (window.innerWidth <= 768) {
-                    const heights = getHeights();
-                    sidebar.style.height = Math.max(heights.peek, Math.min(heights.full, h)) + 'px';
+            function onDragStart(clientY) {
+                if (window.innerWidth > 768) return;
+                isDragging = true;
+                startY = clientY;
+                startHeight = sidebar.offsetHeight;
+                sidebar.style.transition = 'none';
+            }
+
+            function onDragMove(clientY) {
+                if (!isDragging) return;
+                const deltaY = startY - clientY;
+                const newHeight = startHeight + deltaY;
+                const maxHeight = window.innerHeight * 0.92;
+                const minHeight = window.innerHeight * 0.1;
+                
+                if (newHeight >= minHeight && newHeight <= maxHeight) {
+                    sidebar.style.height = `${newHeight}px`;
                 }
             }
 
-            function snapToNearestHeight(currentH) {
-                const heights = getHeights();
-                const diffPeek = Math.abs(currentH - heights.peek);
-                const diffHalf = Math.abs(currentH - heights.half);
-                const diffFull = Math.abs(currentH - heights.full);
-
-                const min = Math.min(diffPeek, diffHalf, diffFull);
-                if (min === diffPeek) setSidebarHeight(heights.peek);
-                else if (min === diffHalf) setSidebarHeight(heights.half);
-                else setSidebarHeight(heights.full);
-            }
-
-            dragHandle.addEventListener('touchstart', function(e) {
-                startY = e.touches[0].clientY;
-                startHeight = sidebar.offsetHeight;
-                sidebar.style.transition = 'none';
-            }, { passive: true });
-
-            dragHandle.addEventListener('touchmove', function(e) {
-                const currentY = e.touches[0].clientY;
-                const deltaY = startY - currentY;
-                setSidebarHeight(startHeight + deltaY);
-            }, { passive: true });
-
-            dragHandle.addEventListener('touchend', function() {
-                sidebar.style.transition = 'height 0.25s cubic-bezier(0.2, 0.8, 0.2, 1)';
-                snapToNearestHeight(sidebar.offsetHeight);
-            });
-
-            let isDragging = false;
-            dragHandle.addEventListener('mousedown', function(e) {
-                isDragging = true;
-                startY = e.clientY;
-                startHeight = sidebar.offsetHeight;
-                sidebar.style.transition = 'none';
-                e.preventDefault();
-            });
-
-            window.addEventListener('mousemove', function(e) {
-                if (!isDragging) return;
-                const deltaY = startY - e.clientY;
-                setSidebarHeight(startHeight + deltaY);
-            });
-
-            window.addEventListener('mouseup', function() {
+            function onDragEnd() {
                 if (!isDragging) return;
                 isDragging = false;
-                sidebar.style.transition = 'height 0.25s cubic-bezier(0.2, 0.8, 0.2, 1)';
-                snapToNearestHeight(sidebar.offsetHeight);
-            });
+                sidebar.style.transition = 'height 0.3s cubic-bezier(0.25, 1, 0.5, 1)';
+            }
 
-            sidebarHeader.onclick = function() {
-                if (window.innerWidth <= 768) {
-                    const heights = getHeights();
-                    const currentH = sidebar.offsetHeight;
-                    if (currentH < heights.full * 0.7) setSidebarHeight(heights.full);
-                    else setSidebarHeight(heights.half);
-                }
-            };
+            dragHandle.addEventListener('mousedown', (e) => onDragStart(e.clientY));
+            window.addEventListener('mousemove', (e) => onDragMove(e.clientY));
+            window.addEventListener('mouseup', onDragEnd);
 
-            mapContainer.onclick = function(e) {
-                if (e.target.id === 'current-location-btn' || e.target.closest('#current-location-btn')) return;
-                if (window.innerWidth <= 768) setSidebarHeight(getHeights().peek);
-            };
+            dragHandle.addEventListener('touchstart', (e) => onDragStart(e.touches[0].clientY));
+            window.addEventListener('touchmove', (e) => onDragMove(e.touches[0].clientY));
+            window.addEventListener('touchend', onDragEnd);
+
+            if (mapContainer) {
+                mapContainer.onclick = function(e) {
+                    if (e.target.id === 'current-location-btn' || e.target.closest('#current-location-btn')) return;
+                    if (window.innerWidth <= 768) {
+                        sidebar.style.height = heights[0];
+                        currentHeightIndex = 0;
+                        sizeToggleArrowBtn.textContent = '▲';
+                    }
+                };
+            }
 
             const statusMsg = document.getElementById('status-msg');
 
-            if (typeof kakao === 'undefined' || !kakao.maps) {
-                statusMsg.innerHTML = '<span style="color:red;">❌ 카카오 지도 SDK 로드 실패</span>';
+            if (typeof google === 'undefined' || !google.maps) {
+                if (statusMsg) statusMsg.innerHTML = '<span style="color:red;">❌ 구글 지도 SDK 로드 실패</span>';
                 return;
             }
 
-            statusMsg.innerHTML = '지도를 초기화하는 중...';
+            if (statusMsg) statusMsg.innerHTML = '지도를 초기화하는 중...';
 
             let centerLat = 37.566535;
             let centerLng = 126.977969;
-            const fixedRadius = 500;
+            
+            function getRadiusByZoom(zoom) {
+                if (zoom >= 18) return 100;
+                if (zoom === 17) return 300;
+                if (zoom === 16) return 500;
+                if (zoom === 15) return 1000;
+                if (zoom === 14) return 2000;
+                if (zoom === 13) return 4000;
+                return 6000;
+            }
 
-            let currentLevel = 3;
-            const container = document.getElementById('map');
-            const options = {
-                center: new kakao.maps.LatLng(centerLat, centerLng),
-                level: currentLevel
-            };
-            const map = new kakao.maps.Map(container, options);
-            const geocoder = new kakao.maps.services.Geocoder();
+            let currentZoom = 15;
+            let radius = getRadiusByZoom(currentZoom);
+
+            const map = new google.maps.Map(mapContainer, {
+                center: { lat: centerLat, lng: centerLng },
+                zoom: currentZoom,
+                streetViewControl: false,
+                mapTypeControl: false
+            });
+
+            const geocoder = new google.maps.Geocoder();
 
             let centerMarker = null;
             let centerCircle = null;
@@ -272,9 +351,14 @@
 
             function updateWishlistButtonCount() {
                 const wishBtn = document.getElementById('wishlist-tab-btn');
-                wishBtn.innerText = `❤️ 찜 (${wishlist.length})`;
-                if (isWishlistMode) wishBtn.classList.add('active');
-                else wishBtn.classList.remove('active');
+                if (wishBtn) {
+                    wishBtn.innerText = `❤️ 찜 (${wishlist.length})`;
+                    if (isWishlistMode) {
+                        wishBtn.classList.add('active');
+                    } else {
+                        wishBtn.classList.remove('active');
+                    }
+                }
             }
             updateWishlistButtonCount();
 
@@ -283,7 +367,8 @@
             }
 
             function isWished(store) {
-                return wishlist.includes(getStoreKey(store));
+                const key = getStoreKey(store);
+                return wishlist.includes(key);
             }
 
             function toggleWish(store, event) {
@@ -291,70 +376,91 @@
                 const key = getStoreKey(store);
                 const index = wishlist.indexOf(key);
 
-                if (index > -1) wishlist.splice(index, 1);
-                else wishlist.push(key);
+                if (index > -1) {
+                    wishlist.splice(index, 1);
+                } else {
+                    wishlist.push(key);
+                }
 
                 localStorage.setItem('my_store_wishlist', JSON.stringify(wishlist));
                 updateWishlistButtonCount();
 
-                if (isWishlistMode) renderWishlist();
-                else filterStores();
+                if (isWishlistMode) {
+                    renderWishlist();
+                } else {
+                    filterStores();
+                }
             }
 
             const globalToggleBtn = document.getElementById('global-toggle-btn');
-            globalToggleBtn.onclick = function() {
-                isAllCollapsed = !isAllCollapsed;
-                const contents = document.querySelectorAll('.group-content');
-                const icons = document.querySelectorAll('.group-title .toggle-icon');
+            if (globalToggleBtn) {
+                globalToggleBtn.onclick = function() {
+                    isAllCollapsed = !isAllCollapsed;
+                    const contents = document.querySelectorAll('.group-content');
+                    const icons = document.querySelectorAll('.group-title .toggle-icon');
 
-                contents.forEach((content, index) => {
-                    if (isAllCollapsed) {
-                        content.classList.add('collapsed');
-                        if (icons[index]) icons[index].style.transform = 'rotate(-90deg)';
-                    } else {
-                        content.classList.remove('collapsed');
-                        if (icons[index]) icons[index].style.transform = 'rotate(0deg)';
-                    }
-                });
-                globalToggleBtn.innerText = isAllCollapsed ? '모두 펼치기' : '모두 접기';
-            };
+                    contents.forEach((content, index) => {
+                        if (isAllCollapsed) {
+                            content.classList.add('collapsed');
+                            if (icons[index]) icons[index].style.transform = 'rotate(-90deg)';
+                        } else {
+                            content.classList.remove('collapsed');
+                            if (icons[index]) icons[index].style.transform = 'rotate(0deg)';
+                        }
+                    });
+
+                    globalToggleBtn.innerText = isAllCollapsed ? '모두 펼치기' : '모두 접기';
+                };
+            }
 
             const wishlistTabBtn = document.getElementById('wishlist-tab-btn');
-            wishlistTabBtn.onclick = function(e) {
-                e.stopPropagation();
-                isWishlistMode = !isWishlistMode;
-                updateWishlistButtonCount();
+            if (wishlistTabBtn) {
+                wishlistTabBtn.onclick = function(e) {
+                    e.stopPropagation();
+                    isWishlistMode = !isWishlistMode;
+                    updateWishlistButtonCount();
 
-                if (isWishlistMode) {
-                    document.getElementById('search-keyword').value = '';
-                    renderWishlist();
-                } else {
-                    renderStores(currentStores, new kakao.maps.LatLng(centerLat, centerLng));
-                }
-            };
+                    const searchKeywordEl = document.getElementById('search-keyword');
+                    if (isWishlistMode) {
+                        if (searchKeywordEl) searchKeywordEl.value = '';
+                        renderWishlist();
+                    } else {
+                        renderStores(currentStores);
+                    }
+                };
+            }
 
-            function updateGuideText(addressName) {
+            function updateGuideText(r, addressName) {
                 const guideEl = document.getElementById('guide-text-msg');
+                if (!guideEl) return;
+                
+                let rangeStr = r >= 1000 ? `${(r / 1000).toFixed(1).replace(/\.0$/, '')}km` : `${r}m`;
+                
                 if (isWishlistMode) {
                     guideEl.innerHTML = `❤️ <strong>찜한 음식점 목록</strong>을 조회 중입니다. (${wishlist.length}개)`;
                     return;
                 }
+
                 if (addressName) {
-                    guideEl.innerHTML = `📍 <strong>중심 위치:</strong> ${addressName}<br>🚶 반경 <strong>500m (도보권)</strong> 내 음식점`;
+                    guideEl.innerHTML = `📍 <strong>중심 위치:</strong> ${addressName}<br>📍 반경 <strong>${rangeStr}</strong> 내 음식점`;
                 } else {
-                    guideEl.innerHTML = `📍 현재 위치 기준 반경 <strong>500m (도보권)</strong> 내 음식점을 불러옵니다.`;
+                    guideEl.innerHTML = `📍 현재 위치 기준 반경 <strong>${rangeStr}</strong> 내 음식점을 불러옵니다.`;
                 }
             }
 
-            function searchDetailAddrFromCoords(coords, callback) {
-                geocoder.coord2Address(coords.getLng(), coords.getLat(), callback);
-            }
-
-            function getMapSearchUrl(platform, name, address) {
-                const query = encodeURIComponent(name + ' ' + address);
-                if (platform === 'naver') return `https://map.naver.com/v5/search/${query}`;
-                else if (platform === 'google') return `https://www.google.com/maps/search/?api=1&query=${query}`;
-                else return `https://www.kakao.com/?q=${query}`;
+            // 지도 플랫폼별 맞춤형 링크 생성 (카카오맵은 상호명 위주로 검색되도록 최적화)
+            function getMapSearchUrl(name, address) {
+                const platformSelect = document.getElementById('map-platform-select');
+                const platform = platformSelect ? platformSelect.value : 'kakao';
+                
+                if (platform === 'naver') {
+                    return `https://map.naver.com/v5/search/${encodeURIComponent(name + ' ' + address)}`;
+                } else if (platform === 'kakao') {
+                    // 카카오맵은 이름이나 키워드 중심으로 검색해야 정확히 매칭됩니다.
+                    return `https://map.kakao.com/?q=${encodeURIComponent(name)}`;
+                } else {
+                    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name + ' ' + address)}`;
+                }
             }
 
             function clearMarkers() {
@@ -370,16 +476,24 @@
                 const R = 6371000;
                 const dLat = deg2rad(lat2 - lat1);
                 const dLon = deg2rad(lon2 - lon1);
-                const a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(deg2rad(lat1))*Math.cos(deg2rad(lat2))*Math.sin(dLon/2)*Math.sin(dLon/2);
-                return Math.round(R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))));
+                const a = 
+                    Math.sin(dLat/2) * Math.sin(dLat/2) +
+                    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * 
+                    Math.sin(dLon/2) * Math.sin(dLon/2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+                return Math.round(R * c);
             }
+
             function deg2rad(deg) { return deg * (Math.PI/180); }
 
             function generateMockTel(storeId, address) {
-                const tail = String(Math.abs(hashCode(storeId || 'store')) % 9000 + 1000);
-                if (address.includes('서울')) return `02-${tail}-${tail}`;
-                if (address.includes('경기')) return `031-${tail}-${tail}`;
-                return `010-${tail}-${tail}`;
+                if (address && address.includes('서울')) {
+                    const tail = String(Math.abs(hashCode(storeId || 'seoul')) % 9000 + 1000);
+                    return `02-${tail}-${tail}`;
+                } else {
+                    const tail = String(Math.abs(hashCode(storeId || 'store')) % 9000 + 1000);
+                    return `031-${tail}-${tail}`;
+                }
             }
 
             function hashCode(str) {
@@ -393,51 +507,54 @@
 
             function getStoreRatingAndReviews(store) {
                 const hashVal = Math.abs(hashCode(store.bizesId || store.bizesNm || 'store'));
-                return { rating: (4.0 + (hashVal % 11) * 0.1).toFixed(1), reviewCount: (hashVal % 85) + 8 };
+                const rating = (4.0 + (hashVal % 11) * 0.1).toFixed(1);
+                const reviewCount = (hashVal % 85) + 8;
+                return { rating, reviewCount };
             }
 
-            // [근본 원칙 적용] KSIC 표준산업분류코드 및 비음식점 사무소 키워드 필터링 검증 함수
-            function getFoodCategory(indsName, indsLargeName, storeName, ksicCode) {
-                const code = String(ksicCode || "").trim();
-                const text = ((indsName || '') + ' ' + (indsLargeName || '') + ' ' + (storeName || '')).toLowerCase();
-                
-                // 1. 사무소, 건축사 등 비음식점 블랙리스트 키워드 차단
+            function getFoodCategory(indsName, indsLargeName, storeName) {
+                if (!indsName) indsName = '';
+                if (!indsLargeName) indsLargeName = '';
+                if (!storeName) storeName = '';
+
+                const text = (indsName + ' ' + indsLargeName + ' ' + storeName).toLowerCase();
                 const excludeKeywords = [
-                    '건축사', '사무소', '엔지니어링', '컨설팅', '법무', '세무', '부동산', '중개', '미용', '헤어', '뷰티', 
-                    '피부', '사우나', '세탁', 'pc방', '약국', '병원', '의원', '치과', '한의원', '학원', '연구소', '개발원', '협회', '조합'
+                    '부동산', '중개', '미용', '헤어', '뷰티', '피부', '욕탕', '사우나', '찜질', 
+                    '세탁', '크리닝', 'pc방', '컴퓨터', '당구장', '오락', '약국', '병원', '의원', 
+                    '치과', '한의원', '학원', '교습', '교육', '문구', '서적', '주유소', '충전소', 
+                    '골프', '헬스', '운동', '스포츠', '정비', '카센터', '임대', '소모품', '안경',
+                    '의류', '패션', '신발', '가전', '핸드폰', '꽃집', '애완', '반려', '인테리어',
+                    '철물', '조명', '가구', '사진', '스튜디오', '공방', '인쇄', '기획', '세무',
+                    '회계', '법무', '노무', '신문', '종교', '교회', '사찰', '성당', '안마', '마사지'
                 ];
+
                 for (const keyword of excludeKeywords) {
                     if (text.includes(keyword)) return null;
-                }
-
-                // 2. 표준산업분류코드가 존재할 경우 음식점업(I56) 필수 체크
-                if (code && !code.startsWith('I56') && !code.startsWith('I5')) {
-                    // 코드가 있지만 음식점 코드가 아니면 확실하게 제외
-                    // 단, 코드 정보가 누락된 레거시 데이터는 텍스트 키워드로 보완 판별
                 }
 
                 const foodCheckKeywords = [
                     '식당', '음식', '요리', '한식', '중식', '일식', '양식', '분식', '구이', '찌개',
                     '국밥', '회', '초밥', '고기', '냉면', '백반', '면', '족발', '보쌈', '치킨',
-                    '호프', '주점', '카페', '커피', '제과', '빵', '패스트푸드', '피자', '햄버거',
-                    '순두부', '국수', '우동', '삼겹살', '곱창', '닭갈비', '뷔페', '포차', '막창',
-                    '갈비', '탕', '수육', '반찬', '도시락', '김밥', '토스트', '샌드위치', '대창'
+                    '호프', '주점', '카페', '커피', '제과', '빵', '패스트푸드', '피자', '햄버거'
                 ];
 
                 let isFood = false;
                 for (const fk of foodCheckKeywords) {
-                    if (text.includes(fk)) { isFood = true; break; }
+                    if (text.includes(fk)) {
+                        isFood = true;
+                        break;
+                    }
                 }
 
-                if (!isFood && code && !code.startsWith('I56')) return null;
+                if (!isFood) return null;
 
-                if (text.includes('한식') || text.includes('순두부') || text.includes('국밥') || text.includes('고기') || text.includes('냉면') || text.includes('백반') || text.includes('삼겹살') || text.includes('찌개') || text.includes('보쌈') || text.includes('족발') || text.includes('국수') || text.includes('갈비') || text.includes('탕') || text.includes('대창')) return '한식';
+                if (text.includes('한식') || text.includes('국밥') || text.includes('고기') || text.includes('냉면') || text.includes('백반') || text.includes('삼겹살') || text.includes('찌개') || text.includes('국수') || text.includes('갈비') || text.includes('탕')) return '한식';
                 if (text.includes('중식') || text.includes('짜장') || text.includes('짬뽕')) return '중식';
-                if (text.includes('일식') || text.includes('초밥') || text.includes('회') || text.includes('돈가스') || text.includes('우동') || text.includes('참치')) return '일식/회';
-                if (text.includes('양식') || text.includes('피자') || text.includes('햄버거') || text.includes('스테이크') || text.includes('파스타')) return '양식/패스트푸드';
+                if (text.includes('일식') || text.includes('초밥') || text.includes('회') || text.includes('돈가스') || text.includes('우동')) return '일식/회';
+                if (text.includes('양식') || text.includes('피자') || text.includes('패밀리') || text.includes('스테이크') || text.includes('파스타')) return '양식/패스트푸드';
                 if (text.includes('커피') || text.includes('카페') || text.includes('디저트') || text.includes('제과') || text.includes('빵')) return '카페/디저트';
                 if (text.includes('분식') || text.includes('김밥') || text.includes('떡볶이')) return '분식';
-                if (text.includes('치킨') || text.includes('호프') || text.includes('주점') || text.includes('포차') || text.includes('맥주') || text.includes('소주') || text.includes('통닭')) return '치킨/술집';
+                if (text.includes('치킨') || text.includes('호프') || text.includes('주점') || text.includes('포차') || text.includes('맥주')) return '치킨/술집';
                 
                 return '기타 음식점';
             }
@@ -449,6 +566,7 @@
                     if (store._cardElement) store._cardElement.classList.remove('selected');
                     return;
                 }
+
                 if (pinnedInfoWindow) pinnedInfoWindow.close();
                 infowindow.open(map, marker);
                 pinnedInfoWindow = infowindow;
@@ -462,6 +580,7 @@
 
             function renderStores(storesToRender) {
                 const listContainer = document.getElementById('store-list-container');
+                if (!listContainer) return;
                 listContainer.innerHTML = '';
                 clearMarkers();
 
@@ -470,52 +589,73 @@
                     return;
                 }
 
-                const selectedPlatform = document.getElementById('map-platform-select').value;
                 const groups = {};
 
                 storesToRender.forEach((store) => {
-                    const groupKey = getFoodCategory(store.indsSclsNm, store.indsLclsNm, store.bizesNm, store.ksicCd);
+                    const groupKey = getFoodCategory(store.indsSclsNm, store.indsLclsNm, store.bizesNm);
                     if (!groupKey) return; 
 
                     if (!groups[groupKey]) groups[groupKey] = [];
                     groups[groupKey].push(store);
 
-                    const storeLat = store.lat;
-                    const storeLon = store.lon;
+                    const storeLat = parseFloat(store.lat || store.y);
+                    const storeLon = parseFloat(store.lon || store.lng || store.x);
                     const name = store.bizesNm || '상호명 없음';
                     const address = store.rdnmAdr || store.lnoAdr || '주소 정보 없음';
                     const tel = (store.telno && store.telno.trim() !== '') ? store.telno : generateMockTel(store.bizesId, address);
+                    const category = store.indsSclsNm || '음식점';
 
-                    store.distanceMeters = getDistanceFromLatLonInMeters(centerLat, centerLng, storeLat, storeLon);
+                    const distanceMeters = getDistanceFromLatLonInMeters(centerLat, centerLng, storeLat, storeLon);
+                    store.distanceMeters = distanceMeters;
+                    
                     const { rating, reviewCount } = getStoreRatingAndReviews(store);
                     store.rating = parseFloat(rating);
                     store.reviewCount = reviewCount;
 
-                    if (storeLat && storeLon) {
-                        const markerPosition = new kakao.maps.LatLng(storeLat, storeLon);
-                        const marker = new kakao.maps.Marker({ position: markerPosition });
-                        marker.setMap(map);
+                    if (!isNaN(storeLat) && !isNaN(storeLon)) {
+                        const markerPosition = { lat: storeLat, lng: storeLon };
+                        const marker = new google.maps.Marker({
+                            position: markerPosition,
+                            map: map
+                        });
 
-                        const mapUrl = getMapSearchUrl(selectedPlatform, name, address);
+                        const mapUrl = getMapSearchUrl(name, address);
                         const isW = isWished(store);
+                        const wishIcon = isW ? '❤️' : '🤍';
+                        const ratingBadgeHtml = `<span style="background:#fff8e1; color:#f59e0b; font-size:11px; padding:1px 4px; border-radius:4px; font-weight:bold; margin-left:4px;">⭐ ${rating} (${reviewCount})</span>`;
                         
                         const infowindowContent = `
-                            <div style="padding:10px; font-size:12px; width:220px; line-height:1.4; background:#1e1e1e; color:#fff; border-radius:8px;">
-                                <div style="font-weight:bold; font-size:14px; margin-bottom:4px; color:#fff;">${name}</div>
-                                <div>⭐ ${rating} (${reviewCount}) · 🟢 영업 중</div>
-                                <div style="color:#aaa; margin-top:4px;">${address}</div>
-                                <div style="margin-top:8px; display:flex; justify-content:space-between;">
-                                    <a href="${mapUrl}" target="_blank" style="color:#60a5fa; text-decoration:none;">지도 앱에서 보기 ↗</a>
-                                    <button onclick="window.toggleWishFromWindow('${getStoreKey(store)}')" style="background:#333; color:#fff; border:none; padding:2px 6px; border-radius:4px; cursor:pointer;">${isW ? '❤️' : '🤍'} 찜</button>
+                            <div style="padding:10px; font-size:12px; width:230px; line-height:1.4;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                    <a href="${mapUrl}" target="_blank" style="font-weight:bold; font-size:14px; color:#0066ff; text-decoration:none;">
+                                        ${name} ${ratingBadgeHtml} 🔗상세보기
+                                    </a>
+                                </div>
+                                <div><strong>업종:</strong> ${category}</div>
+                                <div><strong>주소:</strong> ${address}</div>
+                                <div><strong>전화:</strong> ${tel}</div>
+                                <div><strong>거리:</strong> 중심지에서 약 ${distanceMeters}m</div>
+                                <div style="display:flex; justify-content:flex-end; align-items:center; margin-top:6px;">
+                                    <button onclick="window.toggleWishFromWindow('${getStoreKey(store)}')" style="background:#f1f5f9; border:1px solid #cbd5e1; border-radius:4px; padding:2px 6px; cursor:pointer; font-size:11px;">${wishIcon} 찜하기</button>
                                 </div>
                             </div>
                         `;
 
-                        const infowindow = new kakao.maps.InfoWindow({ content: infowindowContent, removable: true });
+                        const infowindow = new google.maps.InfoWindow({
+                            content: infowindowContent
+                        });
 
-                        kakao.maps.event.addListener(marker, 'mouseover', () => { if (pinnedInfoWindow !== infowindow) infowindow.open(map, marker); });
-                        kakao.maps.event.addListener(marker, 'mouseout', () => { if (pinnedInfoWindow !== infowindow) infowindow.close(); });
-                        kakao.maps.event.addListener(marker, 'click', () => pinStoreOnMap(store, marker, infowindow));
+                        marker.addListener('mouseover', function() {
+                            if (pinnedInfoWindow !== infowindow) infowindow.open(map, marker);
+                        });
+
+                        marker.addListener('mouseout', function() {
+                            if (pinnedInfoWindow !== infowindow) infowindow.close();
+                        });
+
+                        marker.addListener('click', function() {
+                            pinStoreOnMap(store, marker, infowindow);
+                        });
 
                         currentMarkers.push({ marker, infowindow, store });
                     }
@@ -543,48 +683,66 @@
                     titleDiv.onclick = function(e) {
                         e.stopPropagation();
                         const isCollapsed = contentDiv.classList.toggle('collapsed');
-                        titleDiv.querySelector('.toggle-icon').style.transform = isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
+                        const icon = titleDiv.querySelector('.toggle-icon');
+                        if (icon) icon.style.transform = isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
                     };
 
                     section.appendChild(titleDiv);
                     section.appendChild(contentDiv);
 
-                    storeList.sort((a, b) => b.rating - a.rating || b.reviewCount - a.reviewCount || a.distanceMeters - b.distanceMeters);
+                    storeList.sort((a, b) => {
+                        if (b.rating !== a.rating) return b.rating - a.rating;
+                        if (b.reviewCount !== a.reviewCount) return b.reviewCount - a.reviewCount;
+                        return a.distanceMeters - b.distanceMeters;
+                    });
 
                     storeList.forEach((store) => {
                         const name = store.bizesNm || '상호명 없음';
+                        const category = store.indsSclsNm || '업종 정보 없음';
                         const address = store.rdnmAdr || store.lnoAdr || '주소 정보 없음';
                         const tel = (store.telno && store.telno.trim() !== '') ? store.telno : generateMockTel(store.bizesId, address);
-                        const mapUrl = getMapSearchUrl(selectedPlatform, name, address);
+                        const mapUrl = getMapSearchUrl(name, address);
+                        const ratingBadgeHtml = `<span class="rating-badge">⭐ ${store.rating} (${store.reviewCount})</span>`;
+                        const isW = isWished(store);
 
                         const card = document.createElement('div');
                         card.className = 'store-card';
                         store._cardElement = card; 
 
                         card.innerHTML = `
-                            <div class="native-card-header">
-                                <div class="store-name"><span>${name}</span></div>
-                                <button class="wish-btn" title="찜하기">${isWished(store) ? '❤️' : '🤍'}</button>
+                            <div class="store-name">
+                                <span><a href="${mapUrl}" target="_blank" onclick="event.stopPropagation();">${name}</a> ${ratingBadgeHtml}</span>
+                                <div style="display:flex; align-items:center; gap:6px;">
+                                    <button class="wish-btn" title="찜하기">${isW ? '❤️' : '🤍'}</button>
+                                </div>
                             </div>
-                            <div class="store-sub-info">
-                                <span class="rating-badge">★ ${store.rating}</span>
-                                <span class="review-count">(${store.reviewCount})</span>
-                                <span>·</span><span>${store.indsSclsNm || '음식점'}</span>
-                            </div>
-                            <div class="store-status-row"><span class="status-open">🟢 영업 중</span><span style="color: #888;">· 21:00 종료</span></div>
-                            <div class="store-sub-info">📍 ${address} (${store.distanceMeters}m)</div>
-                            <div class="native-action-bar">
-                                <a href="${mapUrl}" target="_blank" onclick="event.stopPropagation();" class="native-action-btn">🧭 경로</a>
-                                <a href="${mapUrl}" target="_blank" onclick="event.stopPropagation();" class="native-action-btn">🚗 시작</a>
-                                <a href="tel:${tel}" onclick="event.stopPropagation();" class="native-action-btn">📞 통화</a>
-                                <button onclick="event.stopPropagation(); alert('링크가 복사되었습니다!');" class="native-action-btn">🔗 공유</button>
-                            </div>
+                            <div class="store-info">📍 ${address}</div>
+                            <div class="store-info">☎️ ${tel} | 📏 ${store.distanceMeters}m</div>
+                            <div class="store-category">🏷️ ${category}</div>
                         `;
 
-                        card.querySelector('.wish-btn').onclick = (e) => toggleWish(store, e);
-                        card.onmouseenter = () => { const f = currentMarkers.find(m => m.store === store); if (f && pinnedInfoWindow !== f.infowindow) f.infowindow.open(map, f.marker); };
-                        card.onmouseleave = () => { const f = currentMarkers.find(m => m.store === store); if (f && pinnedInfoWindow !== f.infowindow) f.infowindow.close(); };
-                        card.onclick = (e) => { e.stopPropagation(); const f = currentMarkers.find(m => m.store === store); if (f) pinStoreOnMap(store, f.marker, f.infowindow); };
+                        const wishBtn = card.querySelector('.wish-btn');
+                        if (wishBtn) {
+                            wishBtn.onclick = function(e) {
+                                toggleWish(store, e);
+                            };
+                        }
+
+                        card.onmouseenter = function() {
+                            const found = currentMarkers.find(m => m.store === store);
+                            if (found && pinnedInfoWindow !== found.infowindow) found.infowindow.open(map, found.marker);
+                        };
+
+                        card.onmouseleave = function() {
+                            const found = currentMarkers.find(m => m.store === store);
+                            if (found && pinnedInfoWindow !== found.infowindow) found.infowindow.close();
+                        };
+
+                        card.onclick = function(e) {
+                            e.stopPropagation();
+                            const found = currentMarkers.find(m => m.store === store);
+                            if (found) pinStoreOnMap(store, found.marker, found.infowindow);
+                        };
 
                         contentDiv.appendChild(card);
                     });
@@ -592,50 +750,114 @@
                     listContainer.appendChild(section);
                 }
 
-                if (totalCount === 0) listContainer.innerHTML = '<p style="text-align: center; color: #888; margin-top: 30px;">반경 500m 내 유효한 음식점이 없습니다.</p>';
+                if (totalCount === 0) {
+                    listContainer.innerHTML = '<p style="text-align: center; color: #888; margin-top: 30px;">반경 내 음식점이 없습니다.</p>';
+                }
             }
 
             window.toggleWishFromWindow = function(storeKey) {
                 const foundStore = currentStores.find(s => getStoreKey(s) === storeKey);
-                if (foundStore) toggleWish(foundStore);
+                if (foundStore) {
+                    toggleWish(foundStore);
+                } else {
+                    const index = wishlist.indexOf(storeKey);
+                    if (index > -1) wishlist.splice(index, 1);
+                    else wishlist.push(storeKey);
+                    localStorage.setItem('my_store_wishlist', JSON.stringify(wishlist));
+                    updateWishlistButtonCount();
+                    renderWishlist();
+                }
             };
 
             function renderWishlist() {
                 const listContainer = document.getElementById('store-list-container');
+                if (!listContainer) return;
                 listContainer.innerHTML = '';
                 clearMarkers();
-                updateGuideText(null);
+                updateGuideText(radius, null);
 
                 if (wishlist.length === 0) {
-                    listContainer.innerHTML = '<p style="text-align: center; color: #888; margin-top: 50px;">찜한 음식점이 없습니다.</p>';
+                    listContainer.innerHTML = '<p style="text-align: center; color: #888; margin-top: 50px;">찜한 음식점이 없습니다. 마음에 드는 식당에 하트를 눌러보세요!</p>';
                     return;
                 }
 
-                const wishedStores = wishlist.map(key => currentStores.find(s => getStoreKey(s) === key)).filter(Boolean);
-                const selectedPlatform = document.getElementById('map-platform-select').value;
+                const wishedStores = [];
+                wishlist.forEach(key => {
+                    let matched = currentStores.find(s => getStoreKey(s) === key);
+                    if (!matched) {
+                        matched = {
+                            bizesId: key,
+                            bizesNm: key.split('_')[0] || '찜한 음식점',
+                            rdnmAdr: key.split('_')[1] || '주소 정보 없음',
+                            lat: centerLat,
+                            lon: centerLng,
+                            distanceMeters: 0
+                        };
+                    }
+                    wishedStores.push(matched);
+                });
+
                 const contentDiv = document.createElement('div');
                 contentDiv.className = 'group-content';
 
                 wishedStores.forEach((store) => {
-                    const name = store.bizesNm;
-                    const address = store.rdnmAdr || store.lnoAdr;
-                    const mapUrl = getMapSearchUrl(selectedPlatform, name, address);
+                    const name = store.bizesNm || '상호명 없음';
+                    const address = store.rdnmAdr || store.lnoAdr || '주소 정보 없음';
+                    const tel = (store.telno && store.telno.trim() !== '') ? store.telno : generateMockTel(store.bizesId, address);
+                    const category = store.indsSclsNm || '즐겨찾기 맛집';
+                    const mapUrl = getMapSearchUrl(name, address);
                     const { rating, reviewCount } = getStoreRatingAndReviews(store);
+                    const ratingBadgeHtml = `<span class="rating-badge">⭐ ${rating} (${reviewCount})</span>`;
+                    const storeLat = parseFloat(store.lat || store.y);
+                    const storeLon = parseFloat(store.lon || store.lng || store.x);
+
+                    if (!isNaN(storeLat) && !isNaN(storeLon)) {
+                        const markerPosition = { lat: storeLat, lng: storeLon };
+                        const marker = new google.maps.Marker({
+                            position: markerPosition,
+                            map: map
+                        });
+
+                        const infowindow = new google.maps.InfoWindow({
+                            content: `<div style="padding:10px; font-size:12px; width:220px;"><strong><a href="${mapUrl}" target="_blank" style="color:#0066ff;">${name} 🔗상세보기</a></strong><br>주소: ${address}</div>`
+                        });
+
+                        marker.addListener('click', function() {
+                            pinStoreOnMap(store, marker, infowindow);
+                        });
+
+                        currentMarkers.push({ marker, infowindow, store });
+                    }
 
                     const card = document.createElement('div');
                     card.className = 'store-card';
+                    store._cardElement = card;
+
                     card.innerHTML = `
-                        <div class="native-card-header"><div class="store-name"><span>${name}</span></div><button class="wish-btn">❤️</button></div>
-                        <div class="store-sub-info"><span class="rating-badge">★ ${rating}</span><span class="review-count">(${reviewCount})</span></div>
-                        <div class="store-sub-info">📍 ${address}</div>
-                        <div class="native-action-bar">
-                            <a href="${mapUrl}" target="_blank" onclick="event.stopPropagation();" class="native-action-btn">🧭 경로</a>
-                            <a href="${mapUrl}" target="_blank" onclick="event.stopPropagation();" class="native-action-btn">🚗 시작</a>
-                            <a href="tel:${store.telno || ''}" onclick="event.stopPropagation();" class="native-action-btn">📞 통화</a>
-                            <button onclick="event.stopPropagation(); alert('복사완료');" class="native-action-btn">🔗 공유</button>
+                        <div class="store-name">
+                            <span><a href="${mapUrl}" target="_blank" onclick="event.stopPropagation();">${name}</a> ${ratingBadgeHtml}</span>
+                            <div style="display:flex; align-items:center; gap:6px;">
+                                <button class="wish-btn" title="찜 해제">❤️</button>
+                            </div>
                         </div>
+                        <div class="store-info">📍 ${address}</div>
+                        <div class="store-info">☎️ ${tel}</div>
+                        <div class="store-category">🏷️ ${category}</div>
                     `;
-                    card.querySelector('.wish-btn').onclick = (e) => toggleWish(store, e);
+
+                    const wishBtn = card.querySelector('.wish-btn');
+                    if (wishBtn) {
+                        wishBtn.onclick = function(e) {
+                            toggleWish(store, e);
+                        };
+                    }
+
+                    card.onclick = function(e) {
+                        e.stopPropagation();
+                        const found = currentMarkers.find(m => m.store === store);
+                        if (found) pinStoreOnMap(store, found.marker, found.infowindow);
+                    };
+
                     contentDiv.appendChild(card);
                 });
 
@@ -646,99 +868,220 @@
                 listContainer.appendChild(section);
             }
 
-            let loadTimer = null;
-            function loadStoresDebounced(lat, lng) {
-                if (isWishlistMode) return;
-                if (loadTimer) clearTimeout(loadTimer);
-                document.getElementById('store-list-container').innerHTML = '<p style="text-align: center; color: #888; margin-top: 30px;">데이터 정제 및 로딩 중...</p>';
-                
-                loadTimer = setTimeout(async () => {
-                    try {
-                        const response = await fetch(`/api/stores/radius?cx=${lng}&cy=${lat}&radius=${fixedRadius}&numOfRows=300`);
-                        const data = await response.json();
-                        let items = data?.body?.items || data?.response?.body?.items?.item || data || [];
-                        if (!Array.isArray(items)) items = items ? [items] : [];
+            async function loadStores(lat, lng) {
+                if (isWishlistMode) return; 
 
-                        // [근본 차단 적용] 가져온 원천 데이터에서 건축사사무소 등 비음식점 철저히 제외
-                        currentStores = items.filter(store => getFoodCategory(store.indsSclsNm, store.indsLclsNm, store.bizesNm, store.ksicCd) !== null);
+                try {
+                    const response = await fetch(`/api/stores/radius?cx=${lng}&cy=${lat}&radius=${radius}`);
+                    const data = await response.json();
 
-                        document.getElementById('search-keyword').value = '';
-                        renderStores(currentStores);
-                    } catch (error) {
-                        console.error(error);
-                        document.getElementById('store-list-container').innerHTML = '<p style="color:red; text-align:center;">데이터를 불러오지 못했습니다.</p>';
+                    let items = [];
+                    if (data?.body?.items) items = data.body.items;
+                    else if (Array.isArray(data)) items = data;
+
+                    if (!Array.isArray(items)) items = items ? [items] : [];
+
+                    currentStores = items.filter(store => getFoodCategory(store.indsSclsNm, store.indsLclsNm, store.bizesNm) !== null);
+
+                    const searchKeywordEl = document.getElementById('search-keyword');
+                    if (searchKeywordEl) searchKeywordEl.value = '';
+                    renderStores(currentStores);
+
+                } catch (error) {
+                    console.error('데이터 로드 실패:', error);
+                    const storeListContainer = document.getElementById('store-list-container');
+                    if (storeListContainer) {
+                        storeListContainer.innerHTML = '<p style="color:red; text-align:center;">데이터를 불러오지 못했습니다.</p>';
                     }
-                }, 300);
+                }
             }
 
             function filterStores() {
                 if (isWishlistMode) return;
-                const keyword = document.getElementById('search-keyword').value.replace(/\s+/g, '').toLowerCase();
-                if (!keyword) { renderStores(currentStores); return; }
+                const searchKeywordEl = document.getElementById('search-keyword');
+                if (!searchKeywordEl) return;
+                
+                const rawKeyword = searchKeywordEl.value;
+                const keyword = rawKeyword.replace(/\s+/g, '').toLowerCase();
+
+                if (!keyword) {
+                    renderStores(currentStores);
+                    return;
+                }
 
                 const filtered = currentStores.filter(store => {
                     const name = (store.bizesNm || '').replace(/\s+/g, '').toLowerCase();
                     const category = (store.indsSclsNm || '').replace(/\s+/g, '').toLowerCase();
                     return name.includes(keyword) || category.includes(keyword);
                 });
+
                 renderStores(filtered);
             }
 
-            document.getElementById('search-btn').onclick = filterStores;
-            document.getElementById('search-keyword').onkeyup = (e) => { (e.key === 'Enter') && filterStores(); };
-            document.getElementById('map-platform-select').onchange = () => { if (isWishlistMode) renderWishlist(); else filterStores(); };
+            const searchBtn = document.getElementById('search-btn');
+            if (searchBtn) searchBtn.onclick = filterStores;
 
-            function updateCenterMarker(latlng) {
+            const searchKeywordEl = document.getElementById('search-keyword');
+            if (searchKeywordEl) {
+                searchKeywordEl.onkeyup = function(event) {
+                    (event.key === 'Enter') && filterStores();
+                };
+            }
+
+            const mapPlatformSelect = document.getElementById('map-platform-select');
+            if (mapPlatformSelect) {
+                mapPlatformSelect.onchange = function() {
+                    if (isWishlistMode) {
+                        renderWishlist();
+                    } else {
+                        renderStores(currentStores);
+                    }
+                };
+            }
+
+            function updateCenterMarker(latLngObj) {
                 if (centerMarker) centerMarker.setMap(null);
                 if (centerCircle) centerCircle.setMap(null);
                 if (centerInfoWindow) centerInfoWindow.close();
 
-                centerMarker = new kakao.maps.Marker({ position: latlng, image: new kakao.maps.MarkerImage('https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_red.png', new kakao.maps.Size(40, 42), { offset: new kakao.maps.Point(13, 37) }) });
-                centerMarker.setMap(map);
+                centerMarker = new google.maps.Marker({
+                    position: latLngObj,
+                    map: map,
+                    icon: {
+                        url: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png'
+                    }
+                });
 
-                centerCircle = new kakao.maps.Circle({ center: latlng, radius: fixedRadius, strokeWeight: 2, strokeColor: '#3b82f6', strokeOpacity: 0.8, fillColor: '#3b82f6', fillOpacity: 0.15 });
-                centerCircle.setMap(map);
+                centerCircle = new google.maps.Circle({
+                    strokeColor: '#ff4d4d',
+                    strokeOpacity: 0.8,
+                    strokeWeight: 2,
+                    fillColor: '#ff4d4d',
+                    fillOpacity: 0.2,
+                    map: map,
+                    center: latLngObj,
+                    radius: radius
+                });
 
-                updateGuideText(null);
-                searchDetailAddrFromCoords(latlng, (result, status) => {
-                    if (status === kakao.maps.services.Status.OK) {
-                        const fullAddress = (result[0].road_address ? result[0].road_address.address_name : '') || (result[0].address ? result[0].address.address_name : '') || '주소 정보 없음';
-                        updateGuideText(fullAddress);
+                updateGuideText(radius, null);
+
+                geocoder.geocode({ location: latLngObj }, function(results, status) {
+                    if (status === 'OK' && results[0]) {
+                        let fullAddress = results[0].formatted_address || '주소 정보 없음';
+                        updateGuideText(radius, fullAddress);
+
+                        centerInfoWindow = new google.maps.InfoWindow({
+                            content: `<div style="padding:8px 12px; font-size:12px; font-weight:bold; color:#d32f2f;">📍 선택된 중심 위치<br><span style="font-weight:normal; color:#333;">${fullAddress}</span></div>`
+                        });
+
+                        centerMarker.addListener('click', function() {
+                            centerInfoWindow.open(map, centerMarker);
+                        });
                     }
                 });
             }
 
-            document.getElementById('current-location-btn').onclick = (e) => {
-                e.stopPropagation();
-                if (!navigator.geolocation) { alert('위치 지원 불가'); return; }
-                if (isWishlistMode) { isWishlistMode = false; updateWishlistButtonCount(); }
+            const currentLocationBtn = document.getElementById('current-location-btn');
+            if (currentLocationBtn) {
+                currentLocationBtn.onclick = function(e) {
+                    e.stopPropagation();
+                    if (!navigator.geolocation) {
+                        alert('이 브라우저는 위치 정보를 지원하지 않습니다.');
+                        return;
+                    }
 
-                navigator.geolocation.getCurrentPosition(pos => {
-                    centerLat = pos.coords.latitude;
-                    centerLng = pos.coords.longitude;
-                    const ll = new kakao.maps.LatLng(centerLat, centerLng);
-                    map.setCenter(ll);
-                    updateCenterMarker(ll);
-                    loadStoresDebounced(centerLat, centerLng);
-                }, () => alert('위치 권한을 확인해주세요.'));
-            };
+                    if (isWishlistMode) {
+                        isWishlistMode = false;
+                        updateWishlistButtonCount();
+                    }
 
-            kakao.maps.event.addListener(map, 'click', (e) => {
-                if (window.innerWidth <= 768) setSidebarHeight(getHeights().peek);
-                if (pinnedInfoWindow) { pinnedInfoWindow.close(); pinnedInfoWindow = null; }
-                document.querySelectorAll('.store-card').forEach(c => c.classList.remove('selected'));
+                    const storeListContainer = document.getElementById('store-list-container');
+                    if (storeListContainer) {
+                        storeListContainer.innerHTML = '<p style="text-align: center; color: #888; margin-top: 50px;">현재 위치를 가져오는 중...</p>';
+                    }
 
-                centerLat = e.latLng.getLat();
-                centerLng = e.latLng.getLng();
-                if (isWishlistMode) { isWishlistMode = false; updateWishlistButtonCount(); }
+                    navigator.geolocation.getCurrentPosition(
+                        function(position) {
+                            centerLat = position.coords.latitude;
+                            centerLng = position.coords.longitude;
 
-                updateCenterMarker(e.latLng);
-                loadStoresDebounced(centerLat, centerLng);
+                            const currentLatLng = { lat: centerLat, lng: centerLng };
+                            map.setCenter(currentLatLng);
+                            updateCenterMarker(currentLatLng);
+                            loadStores(centerLat, centerLng);
+                        },
+                        function(error) {
+                            alert('현재 위치를 가져오지 못했습니다. 위치 권한을 확인해주세요.');
+                            console.warn(error);
+                        },
+                        { timeout: 10000, maximumAge: 0 }
+                    );
+                };
+            }
+
+            map.addListener('zoom_changed', function() {
+                const newZoom = map.getZoom();
+                if (newZoom !== currentZoom) {
+                    currentZoom = newZoom;
+                    radius = getRadiusByZoom(currentZoom);
+                    
+                    const fixedLatLng = { lat: centerLat, lng: centerLng };
+                    updateCenterMarker(fixedLatLng);
+                    loadStores(centerLat, centerLng);
+                }
             });
 
-            const initialLl = new kakao.maps.LatLng(centerLat, centerLng);
-            updateCenterMarker(initialLl);
-            loadStoresDebounced(centerLat, centerLng);
+            map.addListener('click', function(mouseEvent) {
+                if (window.innerWidth <= 768) {
+                    sidebar.style.height = heights[0];
+                    currentHeightIndex = 0;
+                    sizeToggleArrowBtn.textContent = '▲';
+                }
+
+                if (pinnedInfoWindow) {
+                    pinnedInfoWindow.close();
+                    pinnedInfoWindow = null;
+                }
+                document.querySelectorAll('.store-card').forEach(c => c.classList.remove('selected'));
+
+                const latlng = mouseEvent.latLng;
+                centerLat = latlng.lat();
+                centerLng = latlng.lng();
+
+                if (isWishlistMode) {
+                    isWishlistMode = false;
+                    updateWishlistButtonCount();
+                }
+
+                const latLngObj = { lat: centerLat, lng: centerLng };
+                updateCenterMarker(latLngObj);
+                loadStores(centerLat, centerLng);
+            });
+
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        centerLat = position.coords.latitude;
+                        centerLng = position.coords.longitude;
+
+                        const currentLatLng = { lat: centerLat, lng: centerLng };
+                        map.setCenter(currentLatLng);
+                        updateCenterMarker(currentLatLng);
+                        loadStores(centerLat, centerLng);
+                    },
+                    function(error) {
+                        console.warn('현재 위치를 가져올 수 없어 기본 위치로 대체합니다.', error);
+                        const defaultLatLng = { lat: centerLat, lng: centerLng };
+                        updateCenterMarker(defaultLatLng);
+                        loadStores(centerLat, centerLng);
+                    },
+                    { timeout: 10000, maximumAge: 0 }
+                );
+            } else {
+                const defaultLatLng = { lat: centerLat, lng: centerLng };
+                updateCenterMarker(defaultLatLng);
+                loadStores(centerLat, centerLng);
+            }
         };
     </script>
 </body>
