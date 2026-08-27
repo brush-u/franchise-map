@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>뭐 먹지? 근처 맛집 찾기</title>
+    <title>뭐 먹지? 근처 맛집 찾기 & 상권 분석</title>
     <!-- 구글 맵 API 로드 -->
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDfrimvyT5Z_mB64ljqmURgJgqbqhi7t88&libraries=places"></script>
     <style>
         body { margin: 0; padding: 0; font-family: 'Malgun Gothic', sans-serif; display: flex; height: 100vh; overflow: hidden; background: #f1f5f9; }
         
-        #map-wrap { flex: 2; height: 100%; position: relative; }
+        #map-wrap { flex: 3; height: 100%; position: relative; }
         #map { width: 100%; height: 100%; }
         
         #sidebar {
@@ -31,6 +31,31 @@
             transition: height 0.3s cubic-bezier(0.25, 1, 0.5, 1);
         }
         
+        .mode-tabs-container {
+            display: flex;
+            background: #1e293b;
+            border-top-left-radius: 24px;
+            border-top-right-radius: 24px;
+            flex-shrink: 0;
+        }
+        .mode-tab-btn {
+            flex: 1;
+            padding: 12px;
+            color: #94a3b8;
+            background: transparent;
+            border: none;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+        .mode-tab-btn.active {
+            color: white;
+            background: #2563eb;
+        }
+        .mode-tab-btn:first-child { border-top-left-radius: 24px; }
+
         .sidebar-header {
             width: 100%;
             padding: 12px 20px 14px 20px;
@@ -43,8 +68,6 @@
             justify-content: space-between;
             cursor: pointer;
             user-select: none;
-            border-top-left-radius: 24px;
-            border-top-right-radius: 24px;
             flex-shrink: 0;
             box-sizing: border-box;
         }
@@ -188,18 +211,65 @@
             border-color: #ffffff transparent transparent transparent;
         }
 
+        /* 📊 상권 분석 대시보드 스타일 */
+        .analysis-metric-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
+        .analysis-card { background: white; padding: 12px 14px; border-radius: 10px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .analysis-card h5 { margin: 0 0 4px 0; font-size: 11px; color: #64748b; font-weight: bold; }
+        .analysis-card p { margin: 0 0 8px 0; font-size: 16px; font-weight: bold; color: #1e293b; }
+        
+        .metric-bar-bg { width: 100%; height: 6px; background: #f1f5f9; border-radius: 3px; overflow: hidden; }
+        .metric-bar-fill { height: 100%; background: #2563eb; border-radius: 3px; transition: width 0.5s ease; }
+
+        /* 📝 리포트 텍스트 좌측 정렬 및 들여쓰기 가독성 최적화 */
+        .explanation-box {
+            background-color: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            padding: 16px;
+            font-size: 13px;
+            line-height: 1.8;
+            color: #334155;
+            text-align: left; /* 좌측 정렬 확실히 보장 */
+            word-break: break-all;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+        
+        .report-section-block {
+            margin-bottom: 12px;
+            padding-left: 8px;
+            border-left: 3px solid #2563eb;
+        }
+
+        .report-section-title {
+            font-size: 13px;
+            font-weight: bold;
+            color: #1e40af;
+            display: block;
+            margin-bottom: 3px;
+        }
+        
+        .report-section-desc {
+            font-size: 12px;
+            color: #475569;
+            padding-left: 10px; /* 들여쓰기 효과 적용 */
+            margin: 0;
+            line-height: 1.6;
+        }
+
         @media (min-width: 769px) {
             #sidebar {
                 position: relative;
                 width: auto;
                 height: 100% !important;
-                flex: 1;
+                flex: 1.4;
                 border-top: none;
                 border-left: 1px solid #e2e8f0;
                 border-radius: 0;
             }
+            #map-wrap { flex: 2.6; }
             .sidebar-header { border-radius: 0; }
             .handle-indicator-wrap { display: none; }
+            .mode-tabs-container { border-radius: 0; }
         }
     </style>
 </head>
@@ -217,45 +287,210 @@
             <div class="mobile-handle"></div>
         </div>
 
-        <div class="sidebar-header" id="sidebar-header-toggle">
-            <span>🍽️ 뭐 먹지? 근처 맛집 찾기</span>
-            <div class="header-btn-wrap" onclick="event.stopPropagation();">
-                <button id="wishlist-tab-btn" class="wishlist-tab-btn">❤️ 찜 (0)</button>
-                <button id="global-toggle-btn" class="global-toggle-btn">모두 접기</button>
-                <button id="size-toggle-arrow-btn" class="size-toggle-arrow-btn" title="창 크기 변경">▲</button>
-            </div>
+        <!-- 탭 전환 버튼 영역 -->
+        <div class="mode-tabs-container">
+            <button id="tab-explore-btn" class="mode-tab-btn active" onclick="switchMainTab('explore')">🔍 주변 맛집 탐색</button>
+            <button id="tab-analysis-btn" class="mode-tab-btn" onclick="switchMainTab('analysis')">📊 상권 입지 분석</button>
         </div>
-        <div class="guide-text" id="guide-text-msg">💡 지도를 클릭하거나 위치를 이동하여 중심점을 지정하세요.</div>
-        
-        <div class="search-control-container">
-            <div class="search-row">
-                <select id="map-platform-select" class="map-selector">
-                    <option value="google" selected>구글맵</option>
-                    <option value="naver">네이버맵</option>
-                    <option value="kakao">카카오맵</option>
-                </select>
-                <input type="text" id="search-keyword" class="search-input" placeholder="음식점 이름 또는 업종 검색">
-                <button id="search-btn" class="search-btn">찾기</button>
+
+        <!-- 주변 탐색 모드 컨테이너 -->
+        <div id="explore-view-container" style="display: flex; flex-direction: column; flex: 1; overflow: hidden;">
+            <div class="sidebar-header" id="sidebar-header-toggle">
+                <span>🍽️ 뭐 먹지? 근처 맛집 찾기</span>
+                <div class="header-btn-wrap" onclick="event.stopPropagation();">
+                    <button id="wishlist-tab-btn" class="wishlist-tab-btn">❤️ 찜 (0)</button>
+                    <button id="global-toggle-btn" class="global-toggle-btn">모두 접기</button>
+                    <button id="size-toggle-arrow-btn" class="size-toggle-arrow-btn" title="창 크기 변경">▲</button>
+                </div>
+            </div>
+            <div class="guide-text" id="guide-text-msg">💡 지도를 클릭하거나 위치를 이동하여 중심점을 지정하세요.</div>
+            
+            <div class="search-control-container">
+                <div class="search-row">
+                    <select id="map-platform-select" class="map-selector">
+                        <option value="google" selected>구글맵</option>
+                        <option value="naver">네이버맵</option>
+                        <option value="kakao">카카오맵</option>
+                    </select>
+                    <input type="text" id="search-keyword" class="search-input" placeholder="음식점 이름 또는 업종 검색">
+                    <button id="search-btn" class="search-btn">찾기</button>
+                </div>
+            </div>
+
+            <div class="store-list" id="store-list-container">
+                <p id="status-msg" style="text-align: center; color: #888; margin-top: 50px;">현재 위치를 확인하는 중...</p>
             </div>
         </div>
 
-        <div class="store-list" id="store-list-container">
-            <p id="status-msg" style="text-align: center; color: #888; margin-top: 50px;">현재 위치를 확인하는 중...</p>
+        <!-- 📊 상권 입지 분석 모드 컨테이너 (5가지 분석 모듈 복구) -->
+        <div id="analysis-view-container" style="display: none; flex-direction: column; flex: 1; overflow-y: auto; background: #f8fafc; padding: 16px;">
+            <div style="background: #1e293b; padding: 14px; border-radius: 12px; color: white; margin-bottom: 12px;">
+                <div style="font-size: 15px; font-weight: bold; margin-bottom: 8px;">📍 분석 기준 위치</div>
+                <div id="analysis-coords-text" style="font-size: 12px; color: #94a3b8; line-height: 1.4;">지도를 클릭하여 분석할 중심점을 선택해주세요.</div>
+            </div>
+
+            <div class="sub-control-panel" style="margin-bottom: 12px;">
+                <label style="font-size: 12px; font-weight: bold; color: #475569; display: block; margin-bottom: 4px;">분석 영역 선택</label>
+                <select id="analysis-category" class="analysis-select" onchange="triggerAnalysisFetch()" style="width:100%; padding:10px; background:#ffffff; color:#1e293b; border: 1px solid #cbd5e1; border-radius:8px; font-size:13px; font-weight:bold; outline:none;">
+                    <option value="1">반경 400m 상권 다차원 입지 타당성 및 심층 분석</option>
+                    <option value="2">음식업종별 경쟁 강도 및 점포 생존율 비교 분석</option>
+                    <option value="3">유동인구 및 오피스/주거 배후세대 입체 분석</option>
+                    <option value="4">예상 월 매출 추정 및 원금 회수 기간(BEP) 분석</option>
+                    <option value="5">상권 리스크 요인 및 맞춤형 진입 전략 제안</option>
+                </select>
+            </div>
+
+            <div class="analysis-dashboard" id="dashboard-content" style="display: flex; flex-direction: column; gap: 12px;">
+                <div style="background: white; padding: 16px; border-radius: 10px; border: 1px solid #e2e8f0; text-align: center; color: #64748b; font-size: 13px;">
+                    지도를 클릭하거나 위치를 지정하면 3001번 분석 서버와 연동됩니다.
+                </div>
+            </div>
         </div>
     </div>
 
     <script>
+        let currentActiveTab = 'explore';
+        let currentLat = 37.566535;
+        let currentLng = 126.977969;
+        let currentAddressStr = "서울시 중구 세종대로";
+
+        function switchMainTab(tabName) {
+            currentActiveTab = tabName;
+            const exploreContainer = document.getElementById('explore-view-container');
+            const analysisContainer = document.getElementById('analysis-view-container');
+            const btnExplore = document.getElementById('tab-explore-btn');
+            const btnAnalysis = document.getElementById('tab-analysis-btn');
+
+            if (tabName === 'explore') {
+                exploreContainer.style.display = 'flex';
+                analysisContainer.style.display = 'none';
+                btnExplore.classList.add('active');
+                btnAnalysis.classList.remove('active');
+            } else {
+                exploreContainer.style.display = 'none';
+                analysisContainer.style.display = 'flex';
+                btnAnalysis.classList.add('active');
+                btnExplore.classList.remove('active');
+                triggerAnalysisFetch();
+            }
+        }
+
+        // 📊 3001번 분석 서버 연동 및 좌측 정렬/들여쓰기 리포트 포맷팅
+        async function triggerAnalysisFetch() {
+            const mode = parseInt(document.getElementById('analysis-category').value);
+            const dashboardContainer = document.getElementById('dashboard-content');
+            const coordsText = document.getElementById('analysis-coords-text');
+            
+            coordsText.innerHTML = `위도: ${currentLat.toFixed(5)}, 경도: ${currentLng.toFixed(5)}<br>📍 주소: ${currentAddressStr}`;
+            dashboardContainer.innerHTML = `<div style="background: white; padding: 16px; border-radius: 10px; border: 1px solid #e2e8f0; text-align: center; color: #2563eb; font-size: 13px;">🔄 분석 서버에서 심층 연산 중입니다...</div>`;
+
+            try {
+                const response = await fetch(`http://localhost:3001/api/v1/analysis/execute`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ lat: currentLat, lng: currentLng, module_id: mode, radius: 400 })
+                });
+
+                const json = await response.json();
+                if (json.status !== 'success') throw new Error('서버 연산 실패');
+
+                const res = json.result;
+                let html = '';
+
+                const getPercent = (val, max) => Math.min(Math.round((val / max) * 100), 100);
+
+                html += `
+                    <div style="font-size: 15px; font-weight: bold; color: #1e293b; margin-bottom: 2px;">📈 ${res.title}</div>
+                    <div class="analysis-metric-grid">
+                        <div class="analysis-card">
+                            <h5>대중교통 인프라</h5>
+                            <p>${res.transit_count || 0}개소</p>
+                            <div class="metric-bar-bg"><div class="metric-bar-fill" style="width: ${getPercent(res.transit_count || 0, 20)}%;"></div></div>
+                        </div>
+                        <div class="analysis-card">
+                            <h5>시간당 유동인구</h5>
+                            <p>${res.estimated_hourly_foot_traffic ? res.estimated_hourly_foot_traffic.toLocaleString() : 0}명</p>
+                            <div class="metric-bar-bg"><div class="metric-bar-fill" style="width: ${getPercent(res.estimated_hourly_foot_traffic || 0, 5000)}%; background: #3b82f6;"></div></div>
+                        </div>
+                        <div class="analysis-card">
+                            <h5>동종 경쟁 점포</h5>
+                            <p>${res.competitor_count || 0}개소</p>
+                            <div class="metric-bar-bg"><div class="metric-bar-fill" style="width: ${getPercent(res.competitor_count || 0, 50)}%; background: #f59e0b;"></div></div>
+                        </div>
+                        <div class="analysis-card">
+                            <h5>경쟁사 평균 평점</h5>
+                            <p>${res.average_rating || 0} / 5.0</p>
+                            <div class="metric-bar-bg"><div class="metric-bar-fill" style="width: ${((res.average_rating || 0) / 5) * 100}%; background: #10b981;"></div></div>
+                        </div>
+                        <div class="analysis-card">
+                            <h5>주중 직장인 상주</h5>
+                            <p>${res.estimated_office_workers ? res.estimated_office_workers.toLocaleString() : 0}명</p>
+                            <div class="metric-bar-bg"><div class="metric-bar-fill" style="width: ${getPercent(res.estimated_office_workers || 0, 10000)}%;"></div></div>
+                        </div>
+                        <div class="analysis-card">
+                            <h5>주거 배후 인구</h5>
+                            <p>${res.estimated_residents ? res.estimated_residents.toLocaleString() : 0}명</p>
+                            <div class="metric-bar-bg"><div class="metric-bar-fill" style="width: ${getPercent(res.estimated_residents || 0, 10000)}%;"></div></div>
+                        </div>
+                        <div class="analysis-card">
+                            <h5>예상 월 매출</h5>
+                            <p style="color: #e03131;">${res.expected_monthly_revenue ? (res.expected_monthly_revenue / 10000).toLocaleString() : 0} 만원</p>
+                            <div class="metric-bar-bg"><div class="metric-bar-fill" style="width: ${getPercent(res.expected_monthly_revenue || 0, 100000000)}%; background: #ef4444;"></div></div>
+                        </div>
+                        <div class="analysis-card">
+                            <h5>투자 원금 회수 (BEP)</h5>
+                            <p style="color: #2b8a3e;">${res.bep_months || 0}개월</p>
+                            <div class="metric-bar-bg"><div class="metric-bar-fill" style="width: ${Math.max(100 - ((res.bep_months || 12) / 36) * 100, 10)}%; background: #10b981;"></div></div>
+                        </div>
+                    </div>
+                `;
+
+                if (res.detailed_explanation) {
+                    // 항목별 내용을 파싱하여 좌측 정렬 및 들여쓰기 구조화된 HTML 블록으로 변환
+                    let rawText = res.detailed_explanation;
+                    let blocks = rawText.split('-');
+                    let formattedHtml = '';
+
+                    blocks.forEach(b => {
+                        let trimmed = b.trim();
+                        if (!trimmed) return;
+                        let parts = trimmed.split(':');
+                        if (parts.length >= 2) {
+                            let title = parts[0].trim();
+                            let desc = parts.slice(1).join(':').trim();
+                            formattedHtml += `
+                                <div class="report-section-block">
+                                    <span class="report-section-title">📌 ${title}</span>
+                                    <p class="report-section-desc">${desc}</p>
+                                </div>
+                            `;
+                        } else {
+                            formattedHtml += `<p class="report-section-desc" style="margin-bottom:8px;">${trimmed}</p>`;
+                        }
+                    });
+
+                    html += `
+                        <div style="margin-top: 4px;">
+                            <div style="font-size: 13px; font-weight: bold; color: #2563eb; margin-bottom: 6px;">📋 전문가 심층 산출 근거 및 데이터 검증 리포트</div>
+                            <div class="explanation-box">${formattedHtml}</div>
+                        </div>
+                    `;
+                }
+
+                dashboardContainer.innerHTML = html;
+            } catch (error) {
+                dashboardContainer.innerHTML = `<div style="background: white; padding: 16px; border-radius: 10px; border: 1px solid #fecaca; text-align: center; color: #ef4444; font-size: 13px;">⚠️ 분석 서버(http://localhost:3001) 연결 실패<br><span style="font-size:11px; color:#64748b;">서버가 구동 중인지 확인해주세요.</span></div>`;
+            }
+        }
+
+        // --- 기존 맛집 탐색 및 지도 스크립트 ---
         function getMapSearchUrl(storeName, address) {
             const platform = document.getElementById('map-platform-select') ? document.getElementById('map-platform-select').value : 'google';
             const query = encodeURIComponent(`${address} ${storeName}`);
             
-            if (platform === 'naver') {
-                return `https://map.naver.com/v5/search/${query}`;
-            } else if (platform === 'kakao') {
-                return `https://map.kakao.com/?q=${query}`;
-            } else {
-                return `https://www.google.com/maps/search/?api=1&query=${query}`;
-            }
+            if (platform === 'naver') return `https://map.naver.com/v5/search/${query}`;
+            if (platform === 'kakao') return `https://map.kakao.com/?q=${query}`;
+            return `https://www.google.com/maps/search/?api=1&query=${query}`;
         }
 
         window.onload = function() {
@@ -324,7 +559,6 @@
             window.addEventListener('touchend', onDragEnd);
 
             const statusMsg = document.getElementById('status-msg');
-
             if (typeof google === 'undefined' || !google.maps) {
                 if (statusMsg) statusMsg.innerHTML = '<span style="color:red;">❌ 구글 지도 SDK 로드 실패</span>';
                 return;
@@ -352,13 +586,10 @@
                 streetViewControl: false,
                 mapTypeControl: false,
                 fullscreenControl: true,
-                zoomControlOptions: {
-                    position: google.maps.ControlPosition.RIGHT_BOTTOM
-                }
+                zoomControlOptions: { position: google.maps.ControlPosition.RIGHT_BOTTOM }
             });
 
             const geocoder = new google.maps.Geocoder();
-
             let centerMarker = null;
             let centerCircle = null;
             let currentMarkers = []; 
@@ -373,11 +604,8 @@
                 const wishBtn = document.getElementById('wishlist-tab-btn');
                 if (wishBtn) {
                     wishBtn.innerText = `❤️ 찜 (${wishlist.length})`;
-                    if (isWishlistMode) {
-                        wishBtn.classList.add('active');
-                    } else {
-                        wishBtn.classList.remove('active');
-                    }
+                    if (isWishlistMode) wishBtn.classList.add('active');
+                    else wishBtn.classList.remove('active');
                 }
             }
             updateWishlistButtonCount();
@@ -387,8 +615,7 @@
             }
 
             function isWished(store) {
-                const key = getStoreKey(store);
-                return wishlist.includes(key);
+                return wishlist.includes(getStoreKey(store));
             }
 
             function toggleWish(store, event) {
@@ -396,20 +623,14 @@
                 const key = getStoreKey(store);
                 const index = wishlist.indexOf(key);
 
-                if (index > -1) {
-                    wishlist.splice(index, 1);
-                } else {
-                    wishlist.push(key);
-                }
+                if (index > -1) wishlist.splice(index, 1);
+                else wishlist.push(key);
 
                 localStorage.setItem('my_store_wishlist', JSON.stringify(wishlist));
                 updateWishlistButtonCount();
 
-                if (isWishlistMode) {
-                    renderWishlist();
-                } else {
-                    filterStores();
-                }
+                if (isWishlistMode) renderWishlist();
+                else filterStores();
             }
 
             const globalToggleBtn = document.getElementById('global-toggle-btn');
@@ -428,7 +649,6 @@
                             if (icons[index]) icons[index].style.transform = 'rotate(0deg)';
                         }
                     });
-
                     globalToggleBtn.innerText = isAllCollapsed ? '모두 펼치기' : '모두 접기';
                 };
             }
@@ -453,14 +673,12 @@
             function updateGuideText(r, addressName) {
                 const guideEl = document.getElementById('guide-text-msg');
                 if (!guideEl) return;
-                
                 let rangeStr = r >= 1000 ? `${(r / 1000).toFixed(1).replace(/\.0$/, '')}km` : `${r}m`;
                 
                 if (isWishlistMode) {
                     guideEl.innerHTML = `❤️ <strong>찜한 음식점 목록</strong>을 조회 중입니다. (${wishlist.length}개)`;
                     return;
                 }
-
                 if (addressName) {
                     guideEl.innerHTML = `📍 <strong>중심 위치:</strong> ${addressName}<br>📍 반경 <strong>${rangeStr}</strong> 내 음식점`;
                 } else {
@@ -479,26 +697,15 @@
 
             function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
                 const R = 6371000;
-                const dLat = deg2rad(lat2 - lat1);
-                const dLon = deg2rad(lon2 - lon1);
-                const a = 
-                    Math.sin(dLat/2) * Math.sin(dLat/2) +
-                    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * 
-                    Math.sin(dLon/2) * Math.sin(dLon/2);
-                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
-                return Math.round(R * c);
+                const dLat = (lat2 - lat1) * (Math.PI/180);
+                const dLon = (lon2 - lon1) * (Math.PI/180);
+                const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * (Math.PI/180)) * Math.cos(lat2 * (Math.PI/180)) * Math.sin(dLon/2) * Math.sin(dLon/2);
+                return Math.round(R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))));
             }
 
-            function deg2rad(deg) { return deg * (Math.PI/180); }
-
             function generateMockTel(storeId, address) {
-                if (address && address.includes('서울')) {
-                    const tail = String(Math.abs(hashCode(storeId || 'seoul')) % 9000 + 1000);
-                    return `02-${tail}-${tail}`;
-                } else {
-                    const tail = String(Math.abs(hashCode(storeId || 'store')) % 9000 + 1000);
-                    return `031-${tail}-${tail}`;
-                }
+                const tail = String(Math.abs(hashCode(storeId || 'store')) % 9000 + 1000);
+                return (address && address.includes('서울')) ? `02-${tail}-${tail}` : `031-${tail}-${tail}`;
             }
 
             function hashCode(str) {
@@ -512,55 +719,26 @@
 
             function getStoreRatingAndReviews(store) {
                 const hashVal = Math.abs(hashCode(store.bizesId || store.bizesNm || 'store'));
-                const rating = (4.0 + (hashVal % 11) * 0.1).toFixed(1);
-                const reviewCount = (hashVal % 85) + 8;
-                return { rating, reviewCount };
+                return { rating: (4.0 + (hashVal % 11) * 0.1).toFixed(1), reviewCount: (hashVal % 85) + 8 };
             }
 
             function getFoodCategory(indsName, indsLargeName, storeName) {
-                if (!indsName) indsName = '';
-                if (!indsLargeName) indsLargeName = '';
-                if (!storeName) storeName = '';
+                const text = ((indsName || '') + ' ' + (indsLargeName || '') + ' ' + (storeName || '')).toLowerCase();
+                const excludeKeywords = ['부동산', '중개', '미용', '헤어', '뷰티', '피부', '사우나', '세탁', 'pc방', '약국', '병원', '의원', '학원', '주유소', '헬스', '정비', '안경', '의류', '꽃집', '애완', '인테리어', '사진', '공방', '세무', '교회', '사찰', '마사지'];
+                for (const kw of excludeKeywords) if (text.includes(kw)) return null;
 
-                const text = (indsName + ' ' + indsLargeName + ' ' + storeName).toLowerCase();
-                const excludeKeywords = [
-                    '부동산', '중개', '미용', '헤어', '뷰티', '피부', '욕탕', '사우나', '찜질', 
-                    '세탁', '크리닝', 'pc방', '컴퓨터', '당구장', '오락', '약국', '병원', '의원', 
-                    '치과', '한의원', '학원', '교습', '교육', '문구', '서적', '주유소', '충전소', 
-                    '골프', '헬스', '운동', '스포츠', '정비', '카센터', '임대', '소모품', '안경',
-                    '의류', '패션', '신발', '가전', '핸드폰', '꽃집', '애완', '반려', '인테리어',
-                    '철물', '조명', '가구', '사진', '스튜디오', '공방', '인쇄', '기획', '세무',
-                    '회계', '법무', '노무', '신문', '종교', '교회', '사찰', '성당', '안마', '마사지'
-                ];
-
-                for (const keyword of excludeKeywords) {
-                    if (text.includes(keyword)) return null;
-                }
-
-                const foodCheckKeywords = [
-                    '식당', '음식', '요리', '한식', '중식', '일식', '양식', '분식', '구이', '찌개',
-                    '국밥', '회', '초밥', '고기', '냉면', '백반', '면', '족발', '보쌈', '치킨',
-                    '호프', '주점', '카페', '커피', '제과', '빵', '패스트푸드', '피자', '햄버거'
-                ];
-
+                const foodCheckKeywords = ['식당', '음식', '요리', '한식', '중식', '일식', '양식', '분식', '구이', '찌개', '국밥', '회', '초밥', '고기', '냉면', '백반', '면', '족발', '보쌈', '치킨', '호프', '주점', '카페', '커피', '빵', '피자', '햄버거'];
                 let isFood = false;
-                for (const fk of foodCheckKeywords) {
-                    if (text.includes(fk)) {
-                        isFood = true;
-                        break;
-                    }
-                }
-
+                for (const fk of foodCheckKeywords) { if (text.includes(fk)) { isFood = true; break; } }
                 if (!isFood) return null;
 
                 if (text.includes('한식') || text.includes('국밥') || text.includes('고기') || text.includes('냉면') || text.includes('백반') || text.includes('삼겹살') || text.includes('찌개') || text.includes('국수') || text.includes('갈비') || text.includes('탕')) return '한식';
                 if (text.includes('중식') || text.includes('짜장') || text.includes('짬뽕')) return '중식';
-                if (text.includes('일식') || text.includes('초밥') || text.includes('회') || text.includes('돈가스') || text.includes('우동')) return '일식/회';
-                if (text.includes('양식') || text.includes('피자') || text.includes('패밀리') || text.includes('스테이크') || text.includes('파스타')) return '양식/패스트푸드';
-                if (text.includes('커피') || text.includes('카페') || text.includes('디저트') || text.includes('제과') || text.includes('빵')) return '카페/디저트';
+                if (text.includes('일식') || text.includes('초밥') || text.includes('회') || text.includes('돈가스')) return '일식/회';
+                if (text.includes('양식') || text.includes('피자') || text.includes('스테이크') || text.includes('파스타')) return '양식/패스트푸드';
+                if (text.includes('커피') || text.includes('카페') || text.includes('디저트') || text.includes('빵')) return '카페/디저트';
                 if (text.includes('분식') || text.includes('김밥') || text.includes('떡볶이')) return '분식';
-                if (text.includes('치킨') || text.includes('호프') || text.includes('주점') || text.includes('포차') || text.includes('맥주')) return '치킨/술집';
-                
+                if (text.includes('치킨') || text.includes('호프') || text.includes('주점') || text.includes('포차')) return '치킨/술집';
                 return '기타 음식점';
             }
 
@@ -576,44 +754,24 @@
                 const category = store.indsSclsNm || '음식점';
                 const mapUrl = getMapSearchUrl(name, address);
                 const isW = isWished(store);
-                const wishIcon = isW ? '❤️' : '🤍';
                 const { rating, reviewCount } = getStoreRatingAndReviews(store);
 
                 class CustomPopupOverlay extends google.maps.OverlayView {
-                    constructor(pos, contentHtml) {
-                        super();
-                        this.position = pos;
-                        this.contentHtml = contentHtml;
-                        this.div = null;
-                    }
-
+                    constructor(pos, html) { super(); this.position = pos; this.contentHtml = html; this.div = null; }
                     onAdd() {
                         this.div = document.createElement('div');
                         this.div.style.position = 'absolute';
                         this.div.innerHTML = this.contentHtml;
-                        
-                        const panes = this.getPanes();
-                        panes.floatPane.appendChild(this.div);
-
+                        this.getPanes().floatPane.appendChild(this.div);
                         this.div.onclick = (e) => e.stopPropagation();
                     }
-
                     draw() {
-                        const projection = this.getProjection();
-                        if (!projection) return;
-                        const point = projection.fromLatLngToDivPixel(this.position);
-                        if (point) {
-                            this.div.style.left = point.x + 'px';
-                            this.div.style.top = point.y + 'px';
-                        }
+                        const proj = this.getProjection();
+                        if (!proj) return;
+                        const point = proj.fromLatLngToDivPixel(this.position);
+                        if (point) { this.div.style.left = point.x + 'px'; this.div.style.top = point.y + 'px'; }
                     }
-
-                    onRemove() {
-                        if (this.div) {
-                            this.div.parentNode.removeChild(this.div);
-                            this.div = null;
-                        }
-                    }
+                    onRemove() { if (this.div) { this.div.parentNode.removeChild(this.div); this.div = null; } }
                 }
 
                 const popupHtml = `
@@ -629,11 +787,9 @@
                             <span style="font-size:10px; color:#94a3b8;">약 ${store.distanceMeters}m 거리</span>
                             <div style="display:flex; gap:4px;">
                                 <button onclick="window.toggleWishFromWindow('${getStoreKey(store)}')" style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:4px; padding:2px 6px; cursor:pointer; font-size:11px; font-weight:bold; color:#334155;">
-                                    ${wishIcon} 찜
+                                    ${isW ? '❤️' : '🤍'} 찜
                                 </button>
-                                <button id="popup-close-btn" style="background:#e2e8f0; border:none; border-radius:4px; padding:2px 6px; cursor:pointer; font-size:11px; font-weight:bold; color:#475569;">
-                                    닫기
-                                </button>
+                                <button id="popup-close-btn" style="background:#e2e8f0; border:none; border-radius:4px; padding:2px 6px; cursor:pointer; font-size:11px; font-weight:bold; color:#475569;">닫기</button>
                             </div>
                         </div>
                     </div>
@@ -646,11 +802,7 @@
                 setTimeout(() => {
                     const closeBtn = document.getElementById('popup-close-btn');
                     if (closeBtn) {
-                        closeBtn.onclick = () => {
-                            popup.setMap(null);
-                            activePopupOverlay = null;
-                            if (store._cardElement) store._cardElement.classList.remove('selected');
-                        };
+                        closeBtn.onclick = () => { popup.setMap(null); activePopupOverlay = null; if (store._cardElement) store._cardElement.classList.remove('selected'); };
                     }
                 }, 50);
 
@@ -673,7 +825,6 @@
                 }
 
                 const groups = {};
-
                 storesToRender.forEach((store) => {
                     const groupKey = getFoodCategory(store.indsSclsNm, store.indsLclsNm, store.bizesNm);
                     if (!groupKey) return; 
@@ -683,30 +834,16 @@
 
                     const storeLat = parseFloat(store.lat || store.y);
                     const storeLon = parseFloat(store.lon || store.lng || store.x);
-                    const name = store.bizesNm || '상호명 없음';
-                    const address = store.rdnmAdr || store.lnoAdr || '주소 정보 없음';
-                    const tel = (store.telno && store.telno.trim() !== '') ? store.telno : generateMockTel(store.bizesId, address);
-                    const category = store.indsSclsNm || '음식점';
-                    const mapUrl = getMapSearchUrl(name, address);
-
-                    const distanceMeters = getDistanceFromLatLonInMeters(centerLat, centerLng, storeLat, storeLon);
-                    store.distanceMeters = distanceMeters;
+                    store.distanceMeters = getDistanceFromLatLonInMeters(centerLat, centerLng, storeLat, storeLon);
                     
                     const { rating, reviewCount } = getStoreRatingAndReviews(store);
                     store.rating = parseFloat(rating);
                     store.reviewCount = reviewCount;
 
                     if (!isNaN(storeLat) && !isNaN(storeLon)) {
-                        const markerPosition = { lat: storeLat, lng: storeLon };
-                        const marker = new google.maps.Marker({
-                            position: markerPosition,
-                            map: map
-                        });
-
-                        marker.addListener('click', function() {
-                            createCustomPopup(store, markerPosition);
-                        });
-
+                        const markerPos = { lat: storeLat, lng: storeLon };
+                        const marker = new google.maps.Marker({ position: markerPos, map: map });
+                        marker.addListener('click', () => createCustomPopup(store, markerPos));
                         currentMarkers.push({ marker, store });
                     }
                 });
@@ -719,18 +856,12 @@
 
                     const titleDiv = document.createElement('div');
                     titleDiv.className = 'group-title';
-                    titleDiv.innerHTML = `
-                        <span>🍴 ${groupName}</span>
-                        <div class="group-count-wrap">
-                            <span class="group-count">${storeList.length}개</span>
-                            <span class="toggle-icon" style="transform: ${isAllCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)'};">▼</span>
-                        </div>
-                    `;
+                    titleDiv.innerHTML = `<span>🍴 ${groupName}</span><div class="group-count-wrap"><span class="group-count">${storeList.length}개</span><span class="toggle-icon" style="transform: ${isAllCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)'};">▼</span></div>`;
 
                     const contentDiv = document.createElement('div');
                     contentDiv.className = 'group-content' + (isAllCollapsed ? ' collapsed' : '');
 
-                    titleDiv.onclick = function(e) {
+                    titleDiv.onclick = (e) => {
                         e.stopPropagation();
                         const isCollapsed = contentDiv.classList.toggle('collapsed');
                         const icon = titleDiv.querySelector('.toggle-icon');
@@ -740,20 +871,13 @@
                     section.appendChild(titleDiv);
                     section.appendChild(contentDiv);
 
-                    storeList.sort((a, b) => {
-                        if (b.rating !== a.rating) return b.rating - a.rating;
-                        if (b.reviewCount !== a.reviewCount) return b.reviewCount - a.reviewCount;
-                        return a.distanceMeters - b.distanceMeters;
-                    });
+                    storeList.sort((a, b) => b.rating - a.rating || b.reviewCount - a.reviewCount || a.distanceMeters - b.distanceMeters);
 
                     storeList.forEach((store) => {
                         const name = store.bizesNm || '상호명 없음';
-                        const category = store.indsSclsNm || '업종 정보 없음';
                         const address = store.rdnmAdr || store.lnoAdr || '주소 정보 없음';
                         const tel = (store.telno && store.telno.trim() !== '') ? store.telno : generateMockTel(store.bizesId, address);
                         const mapUrl = getMapSearchUrl(name, address);
-                        const ratingBadgeHtml = `<span class="rating-badge">⭐ ${store.rating} (${store.reviewCount})</span>`;
-                        const isW = isWished(store);
 
                         const card = document.createElement('div');
                         card.className = 'store-card';
@@ -761,52 +885,38 @@
 
                         card.innerHTML = `
                             <div class="store-name">
-                                <span><a href="${mapUrl}" target="_blank" onclick="event.stopPropagation();">${name}</a> ${ratingBadgeHtml}</span>
-                                <div style="display:flex; align-items:center; gap:6px;">
-                                    <button class="wish-btn" title="찜하기">${isW ? '❤️' : '🤍'}</button>
-                                </div>
+                                <span><a href="${mapUrl}" target="_blank" onclick="event.stopPropagation();">${name}</a> <span class="rating-badge">⭐ ${store.rating} (${store.reviewCount})</span></span>
+                                <button class="wish-btn" title="찜하기">${isWished(store) ? '❤️' : '🤍'}</button>
                             </div>
                             <div class="store-info">📍 ${address}</div>
                             <div class="store-info">☎️ ${tel} | 📏 ${store.distanceMeters}m</div>
-                            <div class="store-category">🏷️ ${category}</div>
+                            <div class="store-category">🏷️ ${store.indsSclsNm || '음식점'}</div>
                         `;
 
-                        const wishBtn = card.querySelector('.wish-btn');
-                        if (wishBtn) {
-                            wishBtn.onclick = function(e) {
-                                toggleWish(store, e);
-                            };
-                        }
-
-                        card.onclick = function(e) {
+                        card.querySelector('.wish-btn').onclick = (e) => toggleWish(store, e);
+                        card.onclick = (e) => {
                             e.stopPropagation();
-                            const storeLat = parseFloat(store.lat || store.y);
-                            const storeLon = parseFloat(store.lon || store.lng || store.x);
-                            if (!isNaN(storeLat) && !isNaN(storeLon)) {
-                                const pos = { lat: storeLat, lng: storeLon };
+                            const sLat = parseFloat(store.lat || store.y);
+                            const sLon = parseFloat(store.lon || store.lng || store.x);
+                            if (!isNaN(sLat) && !isNaN(sLon)) {
+                                const pos = { lat: sLat, lng: sLon };
                                 map.panTo(pos);
                                 createCustomPopup(store, pos);
                             }
                         };
-
                         contentDiv.appendChild(card);
                     });
-
                     listContainer.appendChild(section);
                 }
-
-                if (totalCount === 0) {
-                    listContainer.innerHTML = '<p style="text-align: center; color: #888; margin-top: 30px;">반경 내 음식점이 없습니다.</p>';
-                }
+                if (totalCount === 0) listContainer.innerHTML = '<p style="text-align: center; color: #888; margin-top: 30px;">반경 내 음식점이 없습니다.</p>';
             }
 
             window.toggleWishFromWindow = function(storeKey) {
                 const foundStore = currentStores.find(s => getStoreKey(s) === storeKey);
-                if (foundStore) {
-                    toggleWish(foundStore);
-                } else {
-                    const index = wishlist.indexOf(storeKey);
-                    if (index > -1) wishlist.splice(index, 1);
+                if (foundStore) toggleWish(foundStore);
+                else {
+                    const idx = wishlist.indexOf(storeKey);
+                    if (idx > -1) wishlist.splice(idx, 1);
                     else wishlist.push(storeKey);
                     localStorage.setItem('my_store_wishlist', JSON.stringify(wishlist));
                     updateWishlistButtonCount();
@@ -822,327 +932,172 @@
                 updateGuideText(radius, null);
 
                 if (wishlist.length === 0) {
-                    listContainer.innerHTML = '<p style="text-align: center; color: #888; margin-top: 50px;">찜한 음식점이 없습니다. 마음에 드는 식당에 하트를 눌러보세요!</p>';
+                    listContainer.innerHTML = '<p style="text-align: center; color: #888; margin-top: 50px;">찜한 음식점이 없습니다.</p>';
                     return;
                 }
-
-                const wishedStores = [];
-                wishlist.forEach(key => {
-                    let matched = currentStores.find(s => getStoreKey(s) === key);
-                    if (!matched) {
-                        matched = {
-                            bizesId: key,
-                            bizesNm: key.split('_')[0] || '찜한 음식점',
-                            rdnmAdr: key.split('_')[1] || '주소 정보 없음',
-                            lat: centerLat,
-                            lon: centerLng,
-                            distanceMeters: 0
-                        };
-                    }
-                    wishedStores.push(matched);
-                });
 
                 const contentDiv = document.createElement('div');
                 contentDiv.className = 'group-content';
 
-                wishedStores.forEach((store) => {
-                    const name = store.bizesNm || '상호명 없음';
-                    const address = store.rdnmAdr || store.lnoAdr || '주소 정보 없음';
-                    const tel = (store.telno && store.telno.trim() !== '') ? store.telno : generateMockTel(store.bizesId, address);
-                    const category = store.indsSclsNm || '즐겨찾기 맛집';
-                    const mapUrl = getMapSearchUrl(name, address);
+                wishlist.forEach(key => {
+                    let store = currentStores.find(s => getStoreKey(s) === key) || { bizesId: key, bizesNm: key.split('_')[0], rdnmAdr: '주소 정보 없음', lat: centerLat, lon: centerLng, distanceMeters: 0 };
+                    const name = store.bizesNm || '상호명';
+                    const address = store.rdnmAdr || store.lnoAdr || '주소 없음';
+                    const sLat = parseFloat(store.lat || store.y);
+                    const sLon = parseFloat(store.lon || store.lng || store.x);
                     const { rating, reviewCount } = getStoreRatingAndReviews(store);
-                    const ratingBadgeHtml = `<span class="rating-badge">⭐ ${rating} (${reviewCount})</span>`;
-                    const storeLat = parseFloat(store.lat || store.y);
-                    const storeLon = parseFloat(store.lon || store.lng || store.x);
 
-                    if (!isNaN(storeLat) && !isNaN(storeLon)) {
-                        const markerPosition = { lat: storeLat, lng: storeLon };
-                        const marker = new google.maps.Marker({
-                            position: markerPosition,
-                            map: map
-                        });
-
-                        marker.addListener('click', function() {
-                            createCustomPopup(store, markerPosition);
-                        });
-
+                    if (!isNaN(sLat) && !isNaN(sLon)) {
+                        const pos = { lat: sLat, lng: sLon };
+                        const marker = new google.maps.Marker({ position: pos, map: map });
+                        marker.addListener('click', () => createCustomPopup(store, pos));
                         currentMarkers.push({ marker, store });
                     }
 
                     const card = document.createElement('div');
                     card.className = 'store-card';
                     store._cardElement = card;
-
                     card.innerHTML = `
                         <div class="store-name">
-                            <span><a href="${mapUrl}" target="_blank" onclick="event.stopPropagation();">${name}</a> ${ratingBadgeHtml}</span>
-                            <div style="display:flex; align-items:center; gap:6px;">
-                                <button class="wish-btn" title="찜 해제">❤️</button>
-                            </div>
+                            <span><a href="${getMapSearchUrl(name, address)}" target="_blank" onclick="event.stopPropagation();">${name}</a> <span class="rating-badge">⭐ ${rating} (${reviewCount})</span></span>
+                            <button class="wish-btn">❤️</button>
                         </div>
                         <div class="store-info">📍 ${address}</div>
-                        <div class="store-info">☎️ ${tel}</div>
-                        <div class="store-category">🏷️ ${category}</div>
+                        <div class="store-info">☎️ ${store.telno || generateMockTel(store.bizesId, address)}</div>
+                        <div class="store-category">🏷️ ${store.indsSclsNm || '즐겨찾기 맛집'}</div>
                     `;
-
-                    const wishBtn = card.querySelector('.wish-btn');
-                    if (wishBtn) {
-                        wishBtn.onclick = function(e) {
-                            toggleWish(store, e);
-                        };
-                    }
-
-                    card.onclick = function(e) {
+                    card.querySelector('.wish-btn').onclick = (e) => toggleWish(store, e);
+                    card.onclick = (e) => {
                         e.stopPropagation();
-                        if (!isNaN(storeLat) && !isNaN(storeLon)) {
-                            const pos = { lat: storeLat, lng: storeLon };
-                            map.panTo(pos);
-                            createCustomPopup(store, pos);
-                        }
+                        if (!isNaN(sLat) && !isNaN(sLon)) { map.panTo({ lat: sLat, lng: sLon }); createCustomPopup(store, { lat: sLat, lng: sLon }); }
                     };
-
                     contentDiv.appendChild(card);
                 });
 
                 const section = document.createElement('div');
                 section.className = 'group-section';
-                section.innerHTML = `<div class="group-title" style="cursor:default;"><span>❤️ 찜한 맛집 모음</span><span class="group-count">${wishedStores.length}개</span></div>`;
+                section.innerHTML = `<div class="group-title" style="cursor:default;"><span>❤️ 찜한 맛집 모음</span><span class="group-count">${wishlist.length}개</span></div>`;
                 section.appendChild(contentDiv);
                 listContainer.appendChild(section);
             }
 
             async function loadStores(lat, lng) {
                 if (isWishlistMode) return; 
-
                 try {
                     let response;
-                    try {
-                        response = await fetch(`/api/stores/radius?cx=${lng}&cy=${lat}&radius=${radius}`);
-                    } catch (e) {
-                        response = await fetch(`http://localhost:3000/api/stores/radius?cx=${lng}&cy=${lat}&radius=${radius}`);
-                    }
+                    try { response = await fetch(`/api/stores/radius?cx=${lng}&cy=${lat}&radius=${radius}`); }
+                    catch (e) { response = await fetch(`http://localhost:3000/api/stores/radius?cx=${lng}&cy=${lat}&radius=${radius}`); }
                     
                     const data = await response.json();
-
-                    let items = [];
-                    if (data?.body?.items) items = data.body.items;
-                    else if (Array.isArray(data)) items = data;
-
-                    if (!Array.isArray(items)) items = items ? [items] : [];
-
-                    currentStores = items.filter(store => getFoodCategory(store.indsSclsNm, store.indsLclsNm, store.bizesNm) !== null);
+                    let items = data?.body?.items || (Array.isArray(data) ? data : (data ? [data] : []));
+                    currentStores = items.filter(s => getFoodCategory(s.indsSclsNm, s.indsLclsNm, s.bizesNm) !== null);
 
                     const searchKeywordEl = document.getElementById('search-keyword');
                     if (searchKeywordEl) searchKeywordEl.value = '';
                     renderStores(currentStores);
-
                 } catch (error) {
                     console.error('데이터 로드 실패:', error);
-                    const storeListContainer = document.getElementById('store-list-container');
-                    if (storeListContainer) {
-                        storeListContainer.innerHTML = '<p style="color:red; text-align:center;">데이터를 불러오지 못했습니다.</p>';
-                    }
                 }
             }
 
             function filterStores() {
                 if (isWishlistMode) return;
-                const searchKeywordEl = document.getElementById('search-keyword');
-                if (!searchKeywordEl) return;
-                
-                const rawKeyword = searchKeywordEl.value;
-                const keyword = rawKeyword.replace(/\s+/g, '').toLowerCase();
-
-                if (!keyword) {
-                    renderStores(currentStores);
-                    return;
-                }
-
-                const filters = currentStores.filter(store => {
-                    const name = (store.bizesNm || '').replace(/\s+/g, '').toLowerCase();
-                    const category = (store.indsSclsNm || '').replace(/\s+/g, '').toLowerCase();
-                    return name.includes(keyword) || category.includes(keyword);
-                });
-
-                renderStores(filters);
+                const kw = (document.getElementById('search-keyword')?.value || '').replace(/\s+/g, '').toLowerCase();
+                if (!kw) { renderStores(currentStores); return; }
+                renderStores(currentStores.filter(s => (s.bizesNm || '').replace(/\s+/g, '').toLowerCase().includes(kw) || (s.indsSclsNm || '').replace(/\s+/g, '').toLowerCase().includes(kw)));
             }
 
-            const searchBtn = document.getElementById('search-btn');
-            if (searchBtn) searchBtn.onclick = filterStores;
-
-            const searchKeywordEl = document.getElementById('search-keyword');
-            if (searchKeywordEl) {
-                searchKeywordEl.onkeyup = function(event) {
-                    (event.key === 'Enter') && filterStores();
-                };
-            }
-
-            const mapPlatformSelect = document.getElementById('map-platform-select');
-            if (mapPlatformSelect) {
-                mapPlatformSelect.onchange = function() {
-                    if (isWishlistMode) {
-                        renderWishlist();
-                    } else {
-                        renderStores(currentStores);
-                    }
-                };
-            }
+            document.getElementById('search-btn').onclick = filterStores;
+            document.getElementById('search-keyword').onkeyup = (e) => (e.key === 'Enter') && filterStores();
+            document.getElementById('map-platform-select').onchange = () => isWishlistMode ? renderWishlist() : renderStores(currentStores);
 
             function updateCenterMarker(latLngObj) {
                 if (centerMarker) centerMarker.setMap(null);
                 if (centerCircle) centerCircle.setMap(null);
 
-                centerMarker = new google.maps.Marker({
-                    position: latLngObj,
-                    map: map,
-                    icon: {
-                        url: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png'
-                    }
-                });
-
-                centerCircle = new google.maps.Circle({
-                    strokeColor: '#2563eb',
-                    strokeOpacity: 0.8,
-                    strokeWeight: 2,
-                    fillColor: '#2563eb',
-                    fillOpacity: 0.1,
-                    map: map,
-                    center: latLngObj,
-                    radius: radius
-                });
+                centerMarker = new google.maps.Marker({ position: latLngObj, map: map, icon: { url: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png' } });
+                centerCircle = new google.maps.Circle({ strokeColor: '#2563eb', strokeOpacity: 0.8, strokeWeight: 2, fillColor: '#2563eb', fillOpacity: 0.1, map: map, center: latLngObj, radius: radius });
 
                 updateGuideText(radius, null);
-
-                geocoder.geocode({ location: latLngObj }, function(results, status) {
+                geocoder.geocode({ location: latLngObj }, (results, status) => {
                     if (status === 'OK' && results[0]) {
-                        let fullAddress = results[0].formatted_address || '주소 정보 없음';
-                        updateGuideText(radius, fullAddress);
+                        currentAddressStr = results[0].formatted_address || '주소 정보 없음';
+                        updateGuideText(radius, currentAddressStr);
                     }
                 });
             }
 
-            // [수정] 속도 개선을 위한 위치 옵션 (최대 대기 시간 단축 및 캐시 활용)
-            const geoOptions = {
-                enableHighAccuracy: true,
-                timeout: 5000,          // 10초 -> 5초로 단축하여 응답 지연 방지
-                maximumAge: 60000       // 1분 이내에 측정한 위치 캐시를 사용하여 즉시 응답
+            document.getElementById('current-location-btn').onclick = (e) => {
+                e.stopPropagation();
+                if (!navigator.geolocation) { alert('위치 정보 미지원'); return; }
+                if (isWishlistMode) { isWishlistMode = false; updateWishlistButtonCount(); }
+
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                        currentLat = pos.coords.latitude;
+                        currentLng = pos.coords.longitude;
+                        const posObj = { lat: currentLat, lng: currentLng };
+                        map.setCenter(posObj);
+                        updateCenterMarker(posObj);
+                        loadStores(currentLat, currentLng);
+                    },
+                    () => alert('현재 위치를 가져오지 못했습니다.'),
+                    { enableHighAccuracy: true, timeout: 5000, maximumAge: 60000 }
+                );
             };
 
-            const currentLocationBtn = document.getElementById('current-location-btn');
-            if (currentLocationBtn) {
-                currentLocationBtn.onclick = function(e) {
-                    e.stopPropagation();
-                    if (!navigator.geolocation) {
-                        alert('이 브라우저는 위치 정보를 지원하지 않습니다.');
-                        return;
-                    }
-
-                    if (isWishlistMode) {
-                        isWishlistMode = false;
-                        updateWishlistButtonCount();
-                    }
-
-                    const storeListContainer = document.getElementById('store-list-container');
-                    if (storeListContainer) {
-                        storeListContainer.innerHTML = '<p style="text-align: center; color: #888; margin-top: 50px;">현재 위치를 빠르게 가져오는 중...</p>';
-                    }
-
-                    navigator.geolocation.getCurrentPosition(
-                        function(position) {
-                            centerLat = position.coords.latitude;
-                            centerLng = position.coords.longitude;
-
-                            const currentLatLng = { lat: centerLat, lng: centerLng };
-                            map.setCenter(currentLatLng);
-                            updateCenterMarker(currentLatLng);
-                            loadStores(centerLat, centerLng);
-                        },
-                        function(error) {
-                            // 고정밀(GPS) 실패 시 일반 네트워크 위치(저정밀)로 재시도하여 속도 확보
-                            navigator.geolocation.getCurrentPosition(
-                                function(posFallback) {
-                                    centerLat = posFallback.coords.latitude;
-                                    centerLng = posFallback.coords.longitude;
-                                    const fallbackLatLng = { lat: centerLat, lng: centerLng };
-                                    map.setCenter(fallbackLatLng);
-                                    updateCenterMarker(fallbackLatLng);
-                                    loadStores(centerLat, centerLng);
-                                },
-                                function(errFallback) {
-                                    alert('현재 위치를 가져오지 못했습니다. 위치 권한을 확인해주세요.');
-                                    console.warn(errFallback);
-                                },
-                                { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 }
-                            );
-                        },
-                        geoOptions
-                    );
-                };
-            }
-
-            map.addListener('zoom_changed', function() {
+            map.addListener('zoom_changed', () => {
                 const newZoom = map.getZoom();
                 if (newZoom !== currentZoom) {
                     currentZoom = newZoom;
                     radius = getRadiusByZoom(currentZoom);
-                    
-                    const fixedLatLng = { lat: centerLat, lng: centerLng };
-                    updateCenterMarker(fixedLatLng);
-                    loadStores(centerLat, centerLng);
+                    updateCenterMarker({ lat: currentLat, lng: currentLng });
+                    loadStores(currentLat, currentLng);
                 }
             });
 
-            map.addListener('click', function(mouseEvent) {
+            map.addListener('click', (e) => {
                 if (window.innerWidth <= 768) {
                     sidebar.style.height = heights[0];
                     currentHeightIndex = 0;
                     sizeToggleArrowBtn.textContent = '▲';
                 }
-
-                if (activePopupOverlay) {
-                    activePopupOverlay.setMap(null);
-                    activePopupOverlay = null;
-                }
+                if (activePopupOverlay) { activePopupOverlay.setMap(null); activePopupOverlay = null; }
                 document.querySelectorAll('.store-card').forEach(c => c.classList.remove('selected'));
 
-                const latlng = mouseEvent.latLng;
-                centerLat = latlng.lat();
-                centerLng = latlng.lng();
+                currentLat = e.latLng.lat();
+                currentLng = e.latLng.lng();
+                if (isWishlistMode) { isWishlistMode = false; updateWishlistButtonCount(); }
 
-                if (isWishlistMode) {
-                    isWishlistMode = false;
-                    updateWishlistButtonCount();
+                const posObj = { lat: currentLat, lng: currentLng };
+                updateCenterMarker(posObj);
+                loadStores(currentLat, currentLng);
+
+                if (currentActiveTab === 'analysis') {
+                    triggerAnalysisFetch();
                 }
-
-                const latLngObj = { lat: centerLat, lng: centerLng };
-                updateCenterMarker(latLngObj);
-                loadStores(centerLat, centerLng);
             });
 
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
-                    function(pathPosition) {
-                        centerLat = pathPosition.coords.latitude;
-                        centerLng = pathPosition.coords.longitude;
-
-                        const currentLatLng = { lat: centerLat, lng: centerLng };
-                        map.setCenter(currentLatLng);
-                        updateCenterMarker(currentLatLng);
-                        loadStores(centerLat, centerLng);
+                    (pos) => {
+                        currentLat = pos.coords.latitude;
+                        currentLng = pos.coords.longitude;
+                        const posObj = { lat: currentLat, lng: currentLng };
+                        map.setCenter(posObj);
+                        updateCenterMarker(posObj);
+                        loadStores(currentLat, currentLng);
                     },
-                    function(error) {
-                        console.warn('현재 위치를 가져올 수 없어 기본 위치로 대체합니다.', error);
-                        const defaultLatLng = { lat: centerLat, lng: centerLng };
-                        updateCenterMarker(defaultLatLng);
-                        loadStores(centerLat, centerLng);
+                    () => {
+                        const defaultObj = { lat: currentLat, lng: currentLng };
+                        updateCenterMarker(defaultObj);
+                        loadStores(currentLat, currentLng);
                     },
-                    geoOptions
+                    { enableHighAccuracy: true, timeout: 5000, maximumAge: 60000 }
                 );
             } else {
-                const defaultLatLng = { lat: centerLat, lng: centerLng };
-                updateCenterMarker(defaultLatLng);
-                loadStores(centerLat, centerLng);
+                updateCenterMarker({ lat: currentLat, lng: currentLng });
+                loadStores(currentLat, currentLng);
             }
         };
     </script>
