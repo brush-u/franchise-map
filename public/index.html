@@ -385,11 +385,27 @@
             dashboardContainer.innerHTML = `<div style="background: white; padding: 16px; border-radius: 10px; border: 1px solid #e2e8f0; text-align: center; color: #2563eb; font-size: 13px;">🔄 분석 서버에서 심층 연산 중입니다...</div>`;
 
             try {
-                const response = await fetch(`http://localhost:3001/api/v1/analysis/execute`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ lat: currentLat, lng: currentLng, module_id: mode, radius: 400 })
-                });
+                
+                //const response = await fetch(`http://localhost:3001/api/v1/analysis/execute`, {
+                    //method: 'POST',
+                    //headers: { 'Content-Type': 'application/json' },
+                    //body: JSON.stringify({ lat: currentLat, lng: currentLng, module_id: mode, radius: 400 })
+                //});
+                
+                // [수정 전 예시]
+// const response = await fetch('http://localhost:3001/api/v1/analysis/execute', { ... });
+
+// [수정 후: 웹 클라우드 배포 및 로컬 환경 자동 분기]
+const analysisApiUrl = window.location.hostname === 'localhost' 
+    ? 'http://localhost:3001/api/v1/analysis/execute' 
+    : '/api/v1/analysis/execute';
+
+const response = await fetch(analysisApiUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ lat: currentLat, lng: currentLng, module_id: mode, radius: 400 })
+});
+
 
                 const json = await response.json();
                 if (json.status !== 'success') throw new Error('서버 연산 실패');
