@@ -598,7 +598,6 @@
             let startY = 0;
             let startHeight = 0;
             let isDragging = false;
-            let listTouchStartY = 0;
             let listDragCandidate = false; // 리스트 맨 위에서 touchstart 했는지 여부
 
             function onDragStart(clientY) {
@@ -642,35 +641,25 @@
             }
 
             // ── 리스트 내부에서도 드래그 가능하게 (구글맵 방식) ──
-            // 리스트가 맨 위(scrollTop === 0)로 스크롤된 상태에서 아래로 당기면 시트를 움직이고,
-            // 그 외(이미 스크롤된 상태, 또는 위로 미는 동작)에는 리스트가 평소대로 스크롤된다.
-            // 이러면 "목록 안 아무 곳이나 잡고 시트를 움직이는" 구글맵 느낌을 그대로 낼 수 있다.
+            // 이전 버전은 touchmove 중간에 방향을 판단해서 뒤늦게 preventDefault를 호출했는데,
+            // 그 시점엔 브라우저가 이미 "이건 스크롤이다"라고 확정지어 버려서 먹히지 않았다.
+            // 그래서 touchstart 시점에 미리 판단한다: 리스트가 맨 위(scrollTop<=1)이고 시트가
+            // 아직 최대로 펼쳐지지 않은 상태라면, 그 터치 제스처 전체를 처음부터 시트 드래그로 취급한다.
             const storeListEl = document.getElementById('store-list-container');
             if (storeListEl) {
                 storeListEl.addEventListener('touchstart', (e) => {
                     if (window.innerWidth > 768) return;
-                    listTouchStartY = e.touches[0].clientY;
-                    listDragCandidate = storeListEl.scrollTop <= 0;
+                    const nearlyMaxed = sidebar.offsetHeight >= window.innerHeight * 0.85;
+                    listDragCandidate = storeListEl.scrollTop <= 1 && !nearlyMaxed;
+                    if (listDragCandidate) {
+                        onDragStart(e.touches[0].clientY);
+                    }
                 }, { passive: true });
 
                 storeListEl.addEventListener('touchmove', (e) => {
                     if (window.innerWidth > 768 || !listDragCandidate) return;
-                    const currentY = e.touches[0].clientY;
-                    const pulledDown = currentY - listTouchStartY;
-
-                    if (!isDragging && pulledDown > 6 && storeListEl.scrollTop <= 0) {
-                        // 리스트 맨 위에서 아래로 당기기 시작 -> 시트 드래그로 전환
-                        onDragStart(listTouchStartY);
-                    }
-                    if (isDragging) {
-                        // 시트를 움직이는 동안엔 리스트 자체의 오버스크롤 바운스가 같이 일어나면
-                        // 어색해 보이므로 기본 스크롤 동작은 막는다.
-                        e.preventDefault();
-                        onDragMove(currentY);
-                    } else {
-                        // 위로 미는 동작이거나 이미 스크롤 중이면 리스트 자체 스크롤에 맡긴다
-                        listDragCandidate = storeListEl.scrollTop <= 0;
-                    }
+                    e.preventDefault();
+                    onDragMove(e.touches[0].clientY);
                 }, { passive: false });
 
                 storeListEl.addEventListener('touchend', () => {
@@ -689,17 +678,19 @@
             let centerLat = 37.566535;
             let centerLng = 126.977969;
             
+            // 분석 목적상 넓은 반경이 필요하지 않다는 피드백에 따라 전체적으로 반경 상한을 낮췄다.
+            // 예전엔 줌아웃하면 최대 6000m까지 갔는데, 그러면 조회할 업소 수가 급증해서 느려진다.
+            // 이제 아무리 줌아웃해도 최대 1500m를 넘지 않는다.
             function getRadiusByZoom(zoom) {
                 if (zoom >= 18) return 100;
-                if (zoom === 17) return 300;
-                if (zoom === 16) return 500;
-                if (zoom === 15) return 1000;
-                if (zoom === 14) return 2000;
-                if (zoom === 13) return 4000;
-                return 6000;
+                if (zoom === 17) return 200;
+                if (zoom === 16) return 400;
+                if (zoom === 15) return 700;
+                if (zoom === 14) return 1000;
+                return 1500; // 13 이하로 아무리 줌아웃해도 여기서 상한
             }
 
-            let currentZoom = 15;
+            let currentZoom = 16; // 초기 진입 시에도 좁은 반경(400m)으로 시작해서 첫 로딩을 빠르게 한다
             let radius = getRadiusByZoom(currentZoom);
 
             const map = new google.maps.Map(mapContainer, {
