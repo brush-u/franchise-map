@@ -4,9 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>뭐 먹지? 근처 맛집 찾기 & 상권 분석</title>
-    <!-- 구글 맵 API 로드 -->
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDfrimvyT5Z_mB64ljqmURgJgqbqhi7t88&libraries=places"></script>
-    <!-- 마커가 많을 때 성능을 위한 클러스터링 라이브러리 -->
+    <!-- 구글 맵 API 로드 (비동기) -->
+    <!-- loading=async + callback으로 로드해야 페이지 파싱을 막지 않는다.
+         예전엔 동기 로드라 이 스크립트가 다 받아질 때까지 화면 자체가 안 그려지고 있었다. -->
+    <script async src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDfrimvyT5Z_mB64ljqmURgJgqbqhi7t88&libraries=places&loading=async&callback=initApp"></script>
+    <!-- 마커가 많을 때 성능을 위한 클러스터링 라이브러리 (파일이 작아 동기 로드해도 부담이 적음.
+         구글맵 콜백보다 먼저 실행되도록 보장하기 위해 async/defer를 안 쓴다) -->
     <script src="https://unpkg.com/@googlemaps/markerclusterer@2.5.3/dist/index.min.js"></script>
     <style>
         *{box-sizing:border-box}
@@ -524,7 +527,7 @@
             return `https://www.google.com/maps/search/?api=1&query=${query}`;
         }
 
-        window.onload = function() {
+        function initApp() {
             const sidebar = document.getElementById('sidebar');
             const mapContainer = document.getElementById('map');
             const dragHandle = document.getElementById('drag-handle');
@@ -647,25 +650,33 @@
             // 아직 최대로 펼쳐지지 않은 상태라면, 그 터치 제스처 전체를 처음부터 시트 드래그로 취급한다.
             const storeListEl = document.getElementById('store-list-container');
             if (storeListEl) {
+                function onListTouchMoveForDrag(e) {
+                    e.preventDefault();
+                    onDragMove(e.touches[0].clientY);
+                }
+                function endListDrag() {
+                    if (listDragCandidate) {
+                        storeListEl.removeEventListener('touchmove', onListTouchMoveForDrag);
+                    }
+                    listDragCandidate = false;
+                    onDragEnd();
+                }
+
                 storeListEl.addEventListener('touchstart', (e) => {
                     if (window.innerWidth > 768) return;
                     const nearlyMaxed = sidebar.offsetHeight >= window.innerHeight * 0.85;
                     listDragCandidate = storeListEl.scrollTop <= 1 && !nearlyMaxed;
                     if (listDragCandidate) {
                         onDragStart(e.touches[0].clientY);
+                        // 드래그로 판단된 제스처에서만 "막는" 리스너를 임시로 붙인다.
+                        // 평소(정상 스크롤)엔 이 리스너 자체가 존재하지 않아서 네이티브 스크롤 성능에
+                        // 전혀 영향을 주지 않는다 (붙어있기만 해도 브라우저가 매 프레임 JS를 기다리게 됨).
+                        storeListEl.addEventListener('touchmove', onListTouchMoveForDrag, { passive: false });
                     }
                 }, { passive: true });
 
-                storeListEl.addEventListener('touchmove', (e) => {
-                    if (window.innerWidth > 768 || !listDragCandidate) return;
-                    e.preventDefault();
-                    onDragMove(e.touches[0].clientY);
-                }, { passive: false });
-
-                storeListEl.addEventListener('touchend', () => {
-                    listDragCandidate = false;
-                    onDragEnd();
-                }, { passive: true });
+                storeListEl.addEventListener('touchend', endListDrag, { passive: true });
+                storeListEl.addEventListener('touchcancel', endListDrag, { passive: true });
             }
 
 
@@ -1491,7 +1502,7 @@
                 updateCenterMarker({ lat: currentLat, lng: currentLng });
                 loadStores(currentLat, currentLng);
             }
-        };
+        }
     </script>
 </body>
 </html>
