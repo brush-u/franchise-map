@@ -1859,7 +1859,7 @@
                         loadStores(currentLat, currentLng);
                     },
                     () => alert('현재 위치를 가져오지 못했습니다.'),
-                    { enableHighAccuracy: true, timeout: 5000, maximumAge: 60000 }
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
                 );
             };
 
@@ -1912,6 +1912,7 @@
             });
 
             if (navigator.geolocation) {
+                showGuideMessage('📍 내 위치를 확인하는 중...');
                 navigator.geolocation.getCurrentPosition(
                     (pos) => {
                         currentLat = pos.coords.latitude;
@@ -1921,14 +1922,20 @@
                         updateCenterMarker(posObj);
                         loadStores(currentLat, currentLng);
                     },
-                    () => {
+                    (err) => {
+                        // 실패해도 조용히 기본 위치로 넘어가면 "내 위치로 조회가 안 됐다"는 걸 알아채기 어렵다.
+                        // 왜 기본 위치가 나왔는지 명확히 알려준다.
+                        console.warn('⚠️ 위치 정보 가져오기 실패:', err.message, '(code:', err.code, ')');
+                        const reason = err.code === 1 ? '위치 권한이 거부되어' : err.code === 3 ? '위치 확인이 너무 오래 걸려' : '위치를 확인할 수 없어';
+                        showGuideMessage(`⚠️ ${reason} 기본 위치(서울시청 인근)로 표시합니다. 상단 "📍 내 위치" 버튼으로 다시 시도할 수 있습니다.`);
                         const defaultObj = { lat: currentLat, lng: currentLng };
                         updateCenterMarker(defaultObj);
                         loadStores(currentLat, currentLng);
                     },
-                    { enableHighAccuracy: true, timeout: 5000, maximumAge: 60000 }
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
                 );
             } else {
+                showGuideMessage('⚠️ 이 브라우저는 위치 정보를 지원하지 않아 기본 위치로 표시합니다.');
                 updateCenterMarker({ lat: currentLat, lng: currentLng });
                 loadStores(currentLat, currentLng);
             }
