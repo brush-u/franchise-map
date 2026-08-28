@@ -331,6 +331,7 @@
             <div class="sidebar-header" id="sidebar-header-toggle">
                 <span>📊 우리 동네 상권 분석</span>
                 <div class="header-btn-wrap" onclick="event.stopPropagation();">
+                    <button id="share-analysis-btn" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 4px 10px; font-size: 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">🔗 공유</button>
                     <button id="open-explore-btn" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 4px 10px; font-size: 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">🔍 맛집 목록</button>
                 </div>
             </div>
@@ -592,6 +593,7 @@
             }
 
             const metrics = computeTradeAreaMetrics(currentStores, radius, currentLat, currentLng);
+            window.__lastMetrics = metrics; // 공유 기능이 최신 분석 결과를 읽을 수 있게 보관
 
             // 데이터가 아직 백그라운드로 계속 들어오는 중이면, 지금 보이는 숫자가 최종이 아니라는 걸
             // 분석 화면에도 분명히 표시한다. (예전엔 이 표시가 없어서 "맛집목록이랑 숫자가 왜 다르지?"
@@ -874,6 +876,71 @@
             return comparisonHtml;
         }
 
+        // ── 분석 결과 공유 ──
+        // 서버에 저장 없이, URL에 위치/반경을 담아서 상대방이 열면 "같은 위치"의 실시간 분석을
+        // 그대로 다시 계산해서 보게 한다 (숫자를 그대로 얼려서 보내는 게 아니라 위치를 공유하는 방식).
+        function buildShareUrl() {
+            const url = new URL(window.location.href);
+            url.search = '';
+            url.searchParams.set('lat', currentLat.toFixed(6));
+            url.searchParams.set('lng', currentLng.toFixed(6));
+            url.searchParams.set('radius', radius);
+            return url.toString();
+        }
+
+        function buildShareText() {
+            const m = window.__lastMetrics;
+            if (!m) return `${currentAddressStr} 상권 분석`;
+            const topCat = m.categoryBreakdown[0];
+            return [
+                `📊 우리 동네 상권 분석 — ${currentAddressStr}`,
+                `반경 ${radius >= 1000 ? (radius / 1000) + 'km' : radius + 'm'} 기준`,
+                ``,
+                `🍽️ 음식점 ${m.total}개 (㎢당 ${m.densityPerKm2.toFixed(1)}개)`,
+                topCat ? `🎯 최다 업종: ${topCat.name} (${topCat.pct.toFixed(0)}%)` : '',
+                `🏪 프랜차이즈 비율: ${m.franchisePct.toFixed(0)}%`,
+                `🌈 업종 다양성 지수: ${m.diversityScore}/100`,
+            ].filter(Boolean).join('\n');
+        }
+
+        async function shareAnalysis() {
+            const shareUrl = buildShareUrl();
+            const shareText = buildShareText();
+            const shareBtn = document.getElementById('share-analysis-btn');
+
+            if (navigator.share) {
+                try {
+                    await navigator.share({ title: '우리 동네 상권 분석', text: shareText, url: shareUrl });
+                    return;
+                } catch (e) {
+                    if (e.name === 'AbortError') return; // 사용자가 공유 취소 — 조용히 넘어간다
+                    // 공유 API가 실패하면 클립보드 복사로 대체 진행
+                }
+            }
+
+            try {
+                await navigator.clipboard.writeText(`${shareText}\n\n${shareUrl}`);
+                if (shareBtn) {
+                    const original = shareBtn.textContent;
+                    shareBtn.textContent = '✅ 복사됨';
+                    setTimeout(() => { shareBtn.textContent = original; }, 1800);
+                }
+            } catch (e) {
+                alert('공유 텍스트를 클립보드에 복사하지 못했습니다.\n\n' + shareText + '\n\n' + shareUrl);
+            }
+        }
+
+        function getSharedLocationFromUrl() {
+            const params = new URLSearchParams(window.location.search);
+            const lat = parseFloat(params.get('lat'));
+            const lng = parseFloat(params.get('lng'));
+            const sharedRadius = parseInt(params.get('radius'), 10);
+            if (!isNaN(lat) && !isNaN(lng)) {
+                return { lat, lng, radius: !isNaN(sharedRadius) ? sharedRadius : null };
+            }
+            return null;
+        }
+
 
         function getMapSearchUrl(storeName, address) {
             const platform = document.getElementById('map-platform-select') ? document.getElementById('map-platform-select').value : 'google';
@@ -896,6 +963,8 @@
             if (openExploreBtn) openExploreBtn.onclick = () => openExplorePanel();
             const closeExploreBtn = document.getElementById('close-explore-btn');
             if (closeExploreBtn) closeExploreBtn.onclick = (e) => { e.stopPropagation(); closeExplorePanel(); };
+            const shareAnalysisBtn = document.getElementById('share-analysis-btn');
+            if (shareAnalysisBtn) shareAnalysisBtn.onclick = (e) => { e.stopPropagation(); shareAnalysis(); };
 
             // ── 데스크톱 사이드바: 마우스로 드래그해서 폭 조절 (조절한 폭은 자동으로 기억됨) ──
             const sidebarResizeHandle = document.getElementById('sidebarResizeHandle');
@@ -1820,7 +1889,23 @@
 
             });
 
-            if (navigator.geolocation) {
+            const sharedLocation = getSharedLocationFromUrl();
+            if (sharedLocation) {
+                // 공유 링크로 들어온 경우 — 위치정보 요청 없이 바로 그 위치로 표시한다.
+                currentLat = sharedLocation.lat;
+                currentLng = sharedLocation.lng;
+                if (sharedLocation.radius) {
+                    radius = sharedLocation.radius;
+                    // 공유받은 반경에 맞는 줌 레벨을 역으로 찾아서 지도 확대 정도도 맞춰준다.
+                    const zoomGuess = [18, 17, 16, 15, 14, 13].find(z => getRadiusByZoom(z) === sharedLocation.radius);
+                    if (zoomGuess) { currentZoom = zoomGuess; map.setZoom(zoomGuess); }
+                }
+                const posObj = { lat: currentLat, lng: currentLng };
+                map.setCenter(posObj);
+                updateCenterMarker(posObj);
+                showGuideMessage('🔗 공유받은 위치의 실시간 분석입니다.');
+                loadStores(currentLat, currentLng);
+            } else if (navigator.geolocation) {
                 showGuideMessage('📍 내 위치를 확인하는 중...');
                 navigator.geolocation.getCurrentPosition(
                     (pos) => {
