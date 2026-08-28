@@ -1106,9 +1106,12 @@
                 return;
             }
 
-            let centerLat = 37.566535;
-            let centerLng = 126.977969;
-            
+            // ⚠️ 예전엔 여기 centerLat/centerLng라는 별도 변수를 만들어서 지도 초기 중심에만 쓰고
+            // 그 뒤로 한 번도 갱신을 안 했다. 그런데 거리 계산(distanceMeters)이 이 값을 참조하고
+            // 있어서, 지도를 아무리 옮겨도 항상 최초 기본 위치 기준으로 거리를 계산해버렸다.
+            // (그래서 "도보 접근성"이 전부 0으로 나왔다 — 실제로는 존재하지 않는 수 km 밖 거리로 계산됨)
+            // 실제로 계속 갱신되는 전역 변수 currentLat/currentLng를 그대로 쓰도록 통일한다.
+
             // 분석 목적상 넓은 반경이 필요하지 않다는 피드백에 따라 전체적으로 반경 상한을 낮췄다.
             // 예전엔 줌아웃하면 최대 6000m까지 갔는데, 그러면 조회할 업소 수가 급증해서 느려진다.
             // 이제 아무리 줌아웃해도 최대 1500m를 넘지 않는다.
@@ -1125,7 +1128,7 @@
             radius = getRadiusByZoom(currentZoom); // 전역 변수에 대입 (재선언하면 분석 탭에서 다시 못 봄)
 
             const map = new google.maps.Map(mapContainer, {
-                center: { lat: centerLat, lng: centerLng },
+                center: { lat: currentLat, lng: currentLng },
                 zoom: currentZoom,
                 streetViewControl: false,
                 mapTypeControl: false,
@@ -1389,7 +1392,7 @@
 
                     const storeLat = parseFloat(store.lat || store.y);
                     const storeLon = parseFloat(store.lon || store.lng || store.x);
-                    store.distanceMeters = getDistanceFromLatLonInMeters(centerLat, centerLng, storeLat, storeLon);
+                    store.distanceMeters = getDistanceFromLatLonInMeters(currentLat, currentLng, storeLat, storeLon);
                     
                     const { rating, reviewCount } = getStoreRatingAndReviews(store);
                     store.rating = parseFloat(rating);
@@ -1524,7 +1527,7 @@
                 const newMarkers = [];
 
                 wishlist.forEach(key => {
-                    let store = currentStores.find(s => getStoreKey(s) === key) || { bizesId: key, bizesNm: key.split('_')[0], rdnmAdr: '주소 정보 없음', lat: centerLat, lon: centerLng, distanceMeters: 0 };
+                    let store = currentStores.find(s => getStoreKey(s) === key) || { bizesId: key, bizesNm: key.split('_')[0], rdnmAdr: '주소 정보 없음', lat: currentLat, lon: currentLng, distanceMeters: 0 };
                     const name = store.bizesNm || '상호명';
                     const address = store.rdnmAdr || store.lnoAdr || '주소 없음';
                     const sLat = parseFloat(store.lat || store.y);
