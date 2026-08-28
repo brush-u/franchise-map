@@ -398,6 +398,7 @@
         // (예전엔 initApp() 안에서만 선언되어 있어서 분석 탭이 이 값들을 아예 못 읽고 조용히 실패했다)
         let currentStores = [];
         let radius = 400;
+        const MAX_TOTAL_FETCH = 3000; // 체감 속도를 위한 상한 (그 이상은 반경을 줄이도록 안내) — 분석 화면도 이 값을 참조해야 해서 전역으로 뺐다.
 
         // 이 프로그램의 주 용도는 상권 분석이라, 분석 화면을 기본으로 항상 보여주고
         // 맛집 목록은 필요할 때만 "🔍 맛집 목록" 버튼으로 슬라이드로 열어본다.
@@ -712,7 +713,8 @@
             if (historyCard) html += historyCard;
 
             if (window.__lastFetchTruncated) {
-                html += `<div style="font-size:14px; color:#94a3b8; text-align:center;">⚠️ 이 반경에 업소가 너무 많아 일부만 반영된 결과입니다. 반경을 줄이면 더 정확합니다.</div>`;
+                const totalRaw = (window.__loadProgress && window.__loadProgress.total) || '?';
+                html += `<div style="font-size:14px; color:#94a3b8; text-align:center;">⚠️ 반경 내 전체 ${totalRaw}건 중 ${MAX_TOTAL_FETCH}건까지만 조회해서 그중 음식점 ${metrics.total}건을 분석했습니다. 반경을 줄이면 더 정확합니다.</div>`;
             }
 
             dashboardContainer.innerHTML = html;
@@ -1593,7 +1595,6 @@
             let pendingStoresLoad = null;
             let storesLoadToken = 0; // 이 값이 바뀌면 이전 백그라운드 로딩은 중단(무시)한다
 
-            const MAX_TOTAL_FETCH = 3000; // 체감 속도를 위한 상한 (그 이상은 반경을 줄이도록 안내)
             const BG_PAGE_DELAY_MS = 250;
             const PREVIEW_SIZE = 30; // "미리보기" 요청 건수 — 작을수록 응답이 빠르다
 
@@ -1786,7 +1787,12 @@
                     window.__loadProgress = { loading: false, loaded: allItems.length, total: totalCount };
                     if (allItems.length >= MAX_TOTAL_FETCH && totalCount > allItems.length) {
                         window.__lastFetchTruncated = true;
-                        showGuideMessage(`⚠️ 업소가 너무 많아 ${MAX_TOTAL_FETCH}건까지만 표시했습니다 (전체 ${totalCount}건). 반경을 줄이면 더 정확합니다.`);
+                        // 예전엔 이 메시지가 "내 음식점 N건" 문구를 덮어써버려서, 실제 분석된 음식점 수를
+                        // 목록 화면에서 확인할 방법이 없었다. 그래서 분석 화면 숫자와 비교하다가
+                        // "왜 다르지?"하는 혼란이 생겼다. 두 숫자를 한 문장에 같이 명시한다.
+                        // (totalCount는 업종필터 성공 여부에 따라 "전체 음식점 수"이거나 "반경 내 전체 업소 수"일 수 있어
+                        //  currentStores.length와 자연스럽게 다를 수 있다 — 이건 버그가 아니라 서로 다른 걸 세는 것)
+                        showGuideMessage(`📍 음식점 <strong>${currentStores.length}건</strong> 분석 완료 (반경 내 전체 ${totalCount}건 중 ${MAX_TOTAL_FETCH}건까지만 조회함). 반경을 줄이면 더 정확합니다.`);
                     }
                     renderTradeAreaAnalysis(); // 로딩 완료 상태를 분석 화면에도 최종 반영
                 } catch (error) {
