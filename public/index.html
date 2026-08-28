@@ -1732,6 +1732,10 @@
 
                     if (hasMore && totalCount > allItems.length) {
                         showGuideMessage(`🔄 더 불러오는 중... (${allItems.length}/${Math.min(totalCount, MAX_TOTAL_FETCH)}건)`);
+                    } else {
+                        // 1페이지만으로 이미 끝난 경우 — 여기서 바로 최종 안내를 띄우지 않으면
+                        // "불러오는 중..." 문구에서 영영 안 바뀌는 문제가 있었다.
+                        showGuideMessage(`📍 현재 위치 기준 반경 <strong>${rangeStrFromRadius(radius)}</strong> 내 음식점 ${currentStores.length}건`);
                     }
 
                     // 나머지 페이지는 뒤에서 계속 이어받는다. 그 사이 사용자가 다른 곳을 클릭/줌하면
@@ -1755,9 +1759,12 @@
                         hasMore = nextPage.body.hasMore;
                         window.__loadProgress = { loading: hasMore && allItems.length < MAX_TOTAL_FETCH, loaded: allItems.length, total: totalCount };
                         mergeAndRenderStores(allItems);
+                        // "내 음식점 N건"은 원본 개수(allItems)가 아니라 실제 음식점으로 걸러진 개수(currentStores)를 써야 한다.
+                        // 서버 업종필터가 실패해서 부동산/미용실 등 비음식 업종까지 섞여 들어온 경우, allItems는
+                        // 훨씬 큰 원본 총합이라 "음식점 2323건"처럼 완전히 틀린 숫자로 보였다.
                         showGuideMessage(hasMore && allItems.length < MAX_TOTAL_FETCH
                             ? `🔄 더 불러오는 중... (${allItems.length}/${Math.min(totalCount, MAX_TOTAL_FETCH)}건)`
-                            : `📍 현재 위치 기준 반경 <strong>${rangeStrFromRadius(radius)}</strong> 내 음식점 ${allItems.length}건`);
+                            : `📍 현재 위치 기준 반경 <strong>${rangeStrFromRadius(radius)}</strong> 내 음식점 ${currentStores.length}건`);
                     }
 
                     window.__loadProgress = { loading: false, loaded: allItems.length, total: totalCount };
