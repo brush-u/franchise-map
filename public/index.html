@@ -3,11 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>뭐 먹지? 근처 맛집 찾기 & 상권 분석</title>
+    <title>우리 동네 상권 분석 & 맛집 찾기</title>
     <!-- 구글 맵 API 로드 (비동기) -->
     <!-- loading=async + callback으로 로드해야 페이지 파싱을 막지 않는다.
          예전엔 동기 로드라 이 스크립트가 다 받아질 때까지 화면 자체가 안 그려지고 있었다. -->
     <script async src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDfrimvyT5Z_mB64ljqmURgJgqbqhi7t88&libraries=places&loading=async&callback=initApp"></script>
+    <!-- 그래프 렌더링용 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
     <!-- 마커가 많을 때 성능을 위한 클러스터링 라이브러리 (파일이 작아 동기 로드해도 부담이 적음.
          구글맵 콜백보다 먼저 실행되도록 보장하기 위해 async/defer를 안 쓴다) -->
     <script src="https://unpkg.com/@googlemaps/markerclusterer@2.5.3/dist/index.min.js"></script>
@@ -55,7 +57,7 @@
             color: #94a3b8;
             background: transparent;
             border: none;
-            font-size: 14px;
+            font-size: 17px;
             font-weight: bold;
             cursor: pointer;
             transition: all 0.2s;
@@ -72,7 +74,7 @@
             padding: 12px 20px 14px 20px;
             background: #2563eb;
             color: white;
-            font-size: 18px;
+            font-size: 21px;
             font-weight: bold;
             display: flex;
             align-items: center;
@@ -97,7 +99,7 @@
         .mobile-handle { width: 48px; height: 5px; background: #cbd5e1; border-radius: 3px; }
         
         .header-btn-wrap { display: flex; gap: 6px; align-items: center; }
-        .global-toggle-btn, .wishlist-tab-btn { background: rgba(255, 255, 255, 0.2); border: 1px solid rgba(255, 255, 255, 0.4); color: white; padding: 4px 10px; font-size: 12px; border-radius: 6px; cursor: pointer; font-weight: normal; transition: background 0.2s; }
+        .global-toggle-btn, .wishlist-tab-btn { background: rgba(255, 255, 255, 0.2); border: 1px solid rgba(255, 255, 255, 0.4); color: white; padding: 4px 10px; font-size: 14px; border-radius: 6px; cursor: pointer; font-weight: normal; transition: background 0.2s; }
         .global-toggle-btn:hover, .wishlist-tab-btn:hover { background: rgba(255, 255, 255, 0.35); }
         .wishlist-tab-btn.active { background: white; color: #2563eb; font-weight: bold; border-color: white; }
 
@@ -112,7 +114,7 @@
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            font-size: 12px;
+            font-size: 14px;
             font-weight: bold;
             transition: background 0.2s;
         }
@@ -120,10 +122,10 @@
 
         .search-control-container { padding: 12px 16px; background: #ffffff; border-bottom: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
         .search-row { display: flex; gap: 6px; align-items: center; }
-        .search-input { flex: 1; padding: 9px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; outline: none; background: #f8fafc; }
+        .search-input { flex: 1; padding: 9px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 17px; outline: none; background: #f8fafc; }
         .search-input:focus { border-color: #2563eb; background: #fff; }
         
-        .map-selector { padding: 9px 8px; font-size: 12px; border-radius: 8px; border: 1px solid #cbd5e1; background: #f8fafc; color: #334155; font-weight: bold; cursor: pointer; outline: none; width: 95px; }
+        .map-selector { padding: 9px 8px; font-size: 14px; border-radius: 8px; border: 1px solid #cbd5e1; background: #f8fafc; color: #334155; font-weight: bold; cursor: pointer; outline: none; width: 95px; }
         
         .search-btn { padding: 9px 14px; background: #2563eb; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
         .search-btn:hover { background: #1d4ed8; }
@@ -139,7 +141,7 @@
             border-radius: 8px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.15);
             font-weight: bold;
-            font-size: 12px;
+            font-size: 14px;
             color: #334155;
             cursor: pointer;
             display: flex;
@@ -158,11 +160,11 @@
         
         .group-section { margin-bottom: 20px; }
         .group-section:last-child { margin-bottom: 0; }
-        .group-title { font-size: 15px; font-weight: bold; color: #1e293b; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 2px solid #2563eb; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; }
+        .group-title { font-size: 18px; font-weight: bold; color: #1e293b; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 2px solid #2563eb; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; }
         .group-title:hover { color: #2563eb; }
         .group-count-wrap { display: flex; align-items: center; gap: 8px; }
-        .group-count { background: #2563eb; color: white; font-size: 11px; padding: 2px 7px; border-radius: 10px; font-weight: normal; }
-        .toggle-icon { font-size: 12px; color: #64748b; transition: transform 0.2s; }
+        .group-count { background: #2563eb; color: white; font-size: 13px; padding: 2px 7px; border-radius: 10px; font-weight: normal; }
+        .toggle-icon { font-size: 14px; color: #64748b; transition: transform 0.2s; }
         
         .group-content { display: flex; flex-direction: column; gap: 8px; transition: all 0.3s ease; }
         .group-content.collapsed { display: none; }
@@ -171,17 +173,17 @@
         .store-card:hover { background: #f8fafc; transform: translateY(-2px); border-color: #cbd5e1; border-left-color: #2563eb; }
         .store-card.selected { background: #eff6ff; border-color: #bfdbfe; border-left-color: #1d4ed8; }
         
-        .store-name { font-size: 15px; font-weight: bold; color: #0f172a; margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center; }
+        .store-name { font-size: 18px; font-weight: bold; color: #0f172a; margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center; }
         .store-name a { color: #2563eb; text-decoration: none; }
         .store-name a:hover { text-decoration: underline; }
-        .store-info { font-size: 12px; color: #475569; margin-bottom: 3px; }
-        .store-category { font-size: 11px; color: #2563eb; font-weight: bold; margin-top: 6px; background: #eff6ff; display: inline-block; padding: 2px 6px; border-radius: 4px; }
+        .store-info { font-size: 14px; color: #475569; margin-bottom: 3px; }
+        .store-category { font-size: 13px; color: #2563eb; font-weight: bold; margin-top: 6px; background: #eff6ff; display: inline-block; padding: 2px 6px; border-radius: 4px; }
         
         .rating-badge {
             background: #fffbeb;
             color: #d97706;
             border: 1px solid #fef3c7;
-            font-size: 11px;
+            font-size: 13px;
             font-weight: bold;
             padding: 2px 6px;
             border-radius: 6px;
@@ -192,10 +194,10 @@
             vertical-align: middle;
         }
 
-        .wish-btn { background: transparent; border: none; font-size: 16px; cursor: pointer; padding: 2px 4px; transition: transform 0.1s; }
+        .wish-btn { background: transparent; border: none; font-size: 19px; cursor: pointer; padding: 2px 4px; transition: transform 0.1s; }
         .wish-btn:active { transform: scale(1.25); }
 
-        .guide-text { padding: 10px 16px; background: #eff6ff; color: #1e40af; font-size: 12px; border-bottom: 1px solid #dbeafe; line-height: 1.4; flex-shrink: 0; }
+        .guide-text { padding: 10px 16px; background: #eff6ff; color: #1e40af; font-size: 14px; border-bottom: 1px solid #dbeafe; line-height: 1.4; flex-shrink: 0; }
 
         .custom-popup-bubble {
             position: absolute;
@@ -226,8 +228,8 @@
         /* 📊 상권 분석 대시보드 스타일 */
         .analysis-metric-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
         .analysis-card { background: white; padding: 12px 14px; border-radius: 10px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
-        .analysis-card h5 { margin: 0 0 4px 0; font-size: 11px; color: #64748b; font-weight: bold; }
-        .analysis-card p { margin: 0 0 8px 0; font-size: 16px; font-weight: bold; color: #1e293b; }
+        .analysis-card h5 { margin: 0 0 4px 0; font-size: 13px; color: #64748b; font-weight: bold; }
+        .analysis-card p { margin: 0 0 8px 0; font-size: 19px; font-weight: bold; color: #1e293b; }
         
         .metric-bar-bg { width: 100%; height: 6px; background: #f1f5f9; border-radius: 3px; overflow: hidden; }
         .metric-bar-fill { height: 100%; background: #2563eb; border-radius: 3px; transition: width 0.5s ease; }
@@ -238,7 +240,7 @@
             border: 1px solid #cbd5e1;
             border-radius: 10px;
             padding: 16px;
-            font-size: 13px;
+            font-size: 15px;
             line-height: 1.8;
             color: #334155;
             text-align: left; /* 좌측 정렬 확실히 보장 */
@@ -253,7 +255,7 @@
         }
 
         .report-section-title {
-            font-size: 13px;
+            font-size: 15px;
             font-weight: bold;
             color: #1e40af;
             display: block;
@@ -261,7 +263,7 @@
         }
         
         .report-section-desc {
-            font-size: 12px;
+            font-size: 14px;
             color: #475569;
             padding-left: 10px; /* 들여쓰기 효과 적용 */
             margin: 0;
@@ -321,24 +323,48 @@
             <div class="mobile-handle"></div>
         </div>
 
-        <!-- 탭 전환 버튼 영역 -->
-        <div class="mode-tabs-container">
-            <button id="tab-explore-btn" class="mode-tab-btn active" onclick="switchMainTab('explore')">🔍 주변 맛집 탐색</button>
-            <button id="tab-analysis-btn" class="mode-tab-btn" onclick="switchMainTab('analysis')">📊 상권 입지 분석</button>
+        <!-- 📊 상권 분석 — 이제 이 화면이 기본(메인) 화면이다 -->
+        <div id="analysis-view-container" style="display: flex; flex-direction: column; flex: 1; overflow: hidden;">
+            <div class="sidebar-header" id="sidebar-header-toggle">
+                <span>📊 우리 동네 상권 분석</span>
+                <div class="header-btn-wrap" onclick="event.stopPropagation();">
+                    <button id="open-explore-btn" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 4px 10px; font-size: 14px; border-radius: 6px; cursor: pointer; font-weight: bold;">🔍 맛집 목록</button>
+                </div>
+            </div>
+
+            <div style="flex:1; overflow-y:auto; padding:16px;" id="analysis-scroll-area">
+                <div style="background: #1e293b; padding: 14px; border-radius: 12px; color: white; margin-bottom: 12px;">
+                    <div style="font-size: 18px; font-weight: bold; margin-bottom: 8px;">📍 분석 대상 반경</div>
+                    <div id="analysis-coords-text" style="font-size: 14px; color: #94a3b8; line-height: 1.4;">지도에서 위치를 이동하면 그 반경 안의 실제 음식점 데이터로 분석합니다.</div>
+                </div>
+
+                <div style="background:#eff6ff; border:1px solid #dbeafe; color:#1e40af; border-radius:8px; padding:10px 14px; font-size:13px; line-height:1.5; margin-bottom:12px;">
+                    ℹ️ 공공데이터포털(소상공인시장진흥공단 상가업소정보)에서 실제로 불러온 반경 내 음식점 데이터를 집계한 결과입니다.
+                    <strong>매출액·실제 유동인구는 무료 공공데이터로 전국 단위 제공이 안 돼서 포함하지 않았습니다.</strong>
+                </div>
+
+                <div class="analysis-dashboard" id="dashboard-content" style="display: flex; flex-direction: column; gap: 14px;">
+                    <div style="background: white; padding: 16px; border-radius: 10px; border: 1px solid #e2e8f0; text-align: center; color: #64748b; font-size: 15px;">
+                        지도에서 위치를 이동하면 데이터를 불러옵니다.
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <!-- 주변 탐색 모드 컨테이너 -->
-        <div id="explore-view-container" style="display: flex; flex-direction: column; flex: 1; overflow: hidden;">
-            <div class="sidebar-header" id="sidebar-header-toggle">
-                <span>🍽️ 뭐 먹지? 근처 맛집 찾기</span>
+        <!-- 🔍 맛집 탐색 — 이제 "자세히 보기" 슬라이드 패널로 전환됨 -->
+        <div id="explore-view-container" style="display: flex; flex-direction: column; position: absolute; inset: 0; background: #f8fafc; transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1); z-index: 200;">
+            <div class="sidebar-header" id="sidebar-header-toggle-explore" style="border-radius:0;">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <button id="close-explore-btn" style="background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.25); color:white; width:32px; height:32px; border-radius:8px; font-size:16px; cursor:pointer; flex-shrink:0;">←</button>
+                    <span>🍽️ 근처 맛집 목록</span>
+                </div>
                 <div class="header-btn-wrap" onclick="event.stopPropagation();">
                     <button id="wishlist-tab-btn" class="wishlist-tab-btn">❤️ 찜 (0)</button>
                     <button id="global-toggle-btn" class="global-toggle-btn">모두 접기</button>
-                    <button id="size-toggle-arrow-btn" class="size-toggle-arrow-btn" title="창 크기 변경">▲</button>
                 </div>
             </div>
             <div class="guide-text" id="guide-text-msg">💡 지도를 클릭하거나 위치를 이동하여 중심점을 지정하세요.</div>
-            
+
             <div class="search-control-container">
                 <div class="search-row">
                     <select id="map-platform-select" class="map-selector">
@@ -349,180 +375,485 @@
                     <input type="text" id="search-keyword" class="search-input" placeholder="음식점 이름 또는 업종 검색">
                     <button id="search-btn" class="search-btn">찾기</button>
                 </div>
+                <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:#475569; cursor:pointer;">
+                    <input type="checkbox" id="franchise-only-check"> 프랜차이즈만 보기
+                </label>
             </div>
 
             <div class="store-list" id="store-list-container">
                 <p id="status-msg" style="text-align: center; color: #888; margin-top: 50px;">현재 위치를 확인하는 중...</p>
             </div>
         </div>
-
-        <!-- 📊 상권 입지 분석 모드 컨테이너 (5가지 분석 모듈 복구) -->
-        <div id="analysis-view-container" style="display: none; flex-direction: column; flex: 1; overflow-y: auto; background: #f8fafc; padding: 16px;">
-            <div style="background: #1e293b; padding: 14px; border-radius: 12px; color: white; margin-bottom: 12px;">
-                <div style="font-size: 15px; font-weight: bold; margin-bottom: 8px;">📍 분석 기준 위치</div>
-                <div id="analysis-coords-text" style="font-size: 12px; color: #94a3b8; line-height: 1.4;">지도를 클릭하여 분석할 중심점을 선택해주세요.</div>
-            </div>
-
-            <div class="sub-control-panel" style="margin-bottom: 12px;">
-                <label style="font-size: 12px; font-weight: bold; color: #475569; display: block; margin-bottom: 4px;">분석 영역 선택</label>
-                <select id="analysis-category" class="analysis-select" onchange="triggerAnalysisFetch()" style="width:100%; padding:10px; background:#ffffff; color:#1e293b; border: 1px solid #cbd5e1; border-radius:8px; font-size:13px; font-weight:bold; outline:none;">
-                    <option value="1">반경 400m 상권 다차원 입지 타당성 및 심층 분석</option>
-                    <option value="2">음식업종별 경쟁 강도 및 점포 생존율 비교 분석</option>
-                    <option value="3">유동인구 및 오피스/주거 배후세대 입체 분석</option>
-                    <option value="4">예상 월 매출 추정 및 원금 회수 기간(BEP) 분석</option>
-                    <option value="5">상권 리스크 요인 및 맞춤형 진입 전략 제안</option>
-                </select>
-            </div>
-
-            <div class="analysis-dashboard" id="dashboard-content" style="display: flex; flex-direction: column; gap: 12px;">
-                <div style="background: white; padding: 16px; border-radius: 10px; border: 1px solid #e2e8f0; text-align: center; color: #64748b; font-size: 13px;">
-                    지도를 클릭하거나 위치를 지정하면 분석 서버와 연동됩니다.
-                </div>
-            </div>
-        </div>
     </div>
+    <style>
+        #explore-view-container.open { transform: translateX(0) !important; }
+    </style>
 
     <script>
-        let currentActiveTab = 'explore';
         let currentLat = 37.566535;
         let currentLng = 126.977969;
         let currentAddressStr = "서울시 중구 세종대로";
+        // currentStores/radius는 initApp() 내부 로직(지도 이벤트 등)에서 계속 갱신되지만,
+        // 상권 분석 함수들은 initApp() 바깥(전역)에 있어서 여기서 선언해야 서로 접근 가능하다.
+        // (예전엔 initApp() 안에서만 선언되어 있어서 분석 탭이 이 값들을 아예 못 읽고 조용히 실패했다)
+        let currentStores = [];
+        let radius = 400;
 
-        function switchMainTab(tabName) {
-            currentActiveTab = tabName;
-            const exploreContainer = document.getElementById('explore-view-container');
-            const analysisContainer = document.getElementById('analysis-view-container');
-            const btnExplore = document.getElementById('tab-explore-btn');
-            const btnAnalysis = document.getElementById('tab-analysis-btn');
-
-            if (tabName === 'explore') {
-                exploreContainer.style.display = 'flex';
-                analysisContainer.style.display = 'none';
-                btnExplore.classList.add('active');
-                btnAnalysis.classList.remove('active');
-            } else {
-                exploreContainer.style.display = 'none';
-                analysisContainer.style.display = 'flex';
-                btnAnalysis.classList.add('active');
-                btnExplore.classList.remove('active');
-                triggerAnalysisFetch();
-            }
+        // 이 프로그램의 주 용도는 상권 분석이라, 분석 화면을 기본으로 항상 보여주고
+        // 맛집 목록은 필요할 때만 "🔍 맛집 목록" 버튼으로 슬라이드로 열어본다.
+        function openExplorePanel() {
+            document.getElementById('explore-view-container').classList.add('open');
         }
 
-        // 📊 3001번 분석 서버 연동 및 좌측 정렬/들여쓰기 리포트 포맷팅
-        async function triggerAnalysisFetch() {
-            const mode = parseInt(document.getElementById('analysis-category').value);
+        function closeExplorePanel() {
+            document.getElementById('explore-view-container').classList.remove('open');
+        }
+
+        // ── 음식 카테고리 분류 (전역) ──
+        // 지도/목록 렌더링과 상권 분석 양쪽에서 다 써야 해서 반드시 전역에 있어야 한다.
+        // (예전엔 initApp() 안에서만 정의돼 있어서 분석 함수가 "getFoodCategory is not defined"로 죽었다)
+        const CATEGORY_ORDER = ['한식', '중식', '일식/회', '양식', '분식', '치킨', '패스트푸드', '카페/디저트', '제과/베이커리', '주점/술집', '기타 음식점'];
+
+        function normalizeMclsCategory(mclsNm) {
+            const m = (mclsNm || '').trim();
+            if (!m) return null;
+            if (m.includes('한식')) return '한식';
+            if (m.includes('중식')) return '중식';
+            if (m.includes('일식')) return '일식/회';
+            if (m.includes('서양식') || m.includes('양식')) return '양식';
+            if (m.includes('분식')) return '분식';
+            if (m.includes('치킨') || m.includes('닭') || m.includes('오리')) return '치킨';
+            if (m.includes('패스트푸드') || m.includes('피자') || m.includes('햄버거') || m.includes('샌드위치')) return '패스트푸드';
+            if (m.includes('커피') || m.includes('카페') || m.includes('음료') || m.includes('디저트')) return '카페/디저트';
+            if (m.includes('제과') || m.includes('베이커리') || m.includes('빵')) return '제과/베이커리';
+            if (m.includes('주점') || m.includes('호프') || m.includes('술집')) return '주점/술집';
+            return m;
+        }
+
+        function getFoodCategory(indsSclsNm, indsLclsNm, storeName, indsMclsNm) {
+            const text = ((indsSclsNm || '') + ' ' + (indsLclsNm || '') + ' ' + (storeName || '')).toLowerCase();
+            const excludeKeywords = ['부동산', '중개', '미용', '헤어', '뷰티', '피부', '사우나', '세탁', 'pc방', '약국', '병원', '의원', '학원', '주유소', '헬스', '정비', '안경', '의류', '꽃집', '애완', '인테리어', '사진', '공방', '세무', '교회', '사찰', '마사지'];
+            for (const kw of excludeKeywords) if (text.includes(kw)) return null;
+
+            const isFoodByLclsNm = (indsLclsNm || '').trim() === '음식';
+
+            const foodCheckKeywords = ['식당', '음식', '요리', '한식', '중식', '일식', '양식', '분식', '구이', '찌개', '국밥', '회', '초밥', '고기', '냉면', '백반', '면', '족발', '보쌈', '치킨', '호프', '주점', '카페', '커피', '빵', '피자', '햄버거'];
+            let isFoodByKeyword = false;
+            for (const fk of foodCheckKeywords) { if (text.includes(fk)) { isFoodByKeyword = true; break; } }
+
+            const isFood = isFoodByLclsNm || (!indsLclsNm && isFoodByKeyword);
+            if (!isFood) return null;
+
+            const byMcls = normalizeMclsCategory(indsMclsNm);
+            if (byMcls) return byMcls;
+
+            if (text.includes('한식') || text.includes('국밥') || text.includes('백반') || text.includes('삼겹살') || text.includes('찌개') || text.includes('갈비') || text.includes('냉면')) return '한식';
+            if (text.includes('중식') || text.includes('짜장') || text.includes('짬뽕')) return '중식';
+            if (text.includes('일식') || text.includes('초밥') || text.includes('돈가스')) return '일식/회';
+            if (text.includes('양식') || text.includes('스테이크') || text.includes('파스타')) return '양식';
+            if (text.includes('피자') || text.includes('햄버거')) return '패스트푸드';
+            if (text.includes('커피') || text.includes('카페') || text.includes('디저트')) return '카페/디저트';
+            if (text.includes('빵') || text.includes('베이커리')) return '제과/베이커리';
+            if (text.includes('분식') || text.includes('김밥') || text.includes('떡볶이')) return '분식';
+            if (text.includes('치킨')) return '치킨';
+            if (text.includes('호프') || text.includes('주점') || text.includes('포차')) return '주점/술집';
+            return '기타 음식점';
+        }
+
+        function sortGroupEntries(groups) {
+            return Object.entries(groups).sort(([aName, aList], [bName, bList]) => {
+                const ai = CATEGORY_ORDER.indexOf(aName);
+                const bi = CATEGORY_ORDER.indexOf(bName);
+                if (ai !== -1 && bi !== -1) return ai - bi;
+                if (ai !== -1) return -1;
+                if (bi !== -1) return 1;
+                return bList.length - aList.length;
+            });
+        }
+
+        // ── 상권 분석 (Tier 1: 이미 불러온 실제 반경 데이터로 즉시 계산, 서버 호출 없음) ──
+        function computeTradeAreaMetrics(stores, radiusM, centerLat, centerLng) {
+            const total = stores.length;
+            const areaKm2 = Math.PI * Math.pow(radiusM / 1000, 2);
+            const densityPerKm2 = areaKm2 > 0 ? total / areaKm2 : 0;
+
+            // 업종 구성비 (= 업종별 경쟁 포화도이기도 함, 그래프로 한 번에 보여준다)
+            const categoryCounts = {};
+            stores.forEach(s => {
+                const cat = getFoodCategory(s.indsSclsNm, s.indsLclsNm, s.bizesNm, s.indsMclsNm) || '기타';
+                categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+            });
+            const categoryBreakdown = Object.entries(categoryCounts)
+                .map(([name, count]) => ({ name, count, pct: total > 0 ? (count / total * 100) : 0 }))
+                .sort((a, b) => b.count - a.count);
+
+            // 프랜차이즈 비율 (지점명 등록 여부 기준 근사치)
+            const franchiseStores = stores.filter(s => (s.brchNm || '').trim() !== '');
+            const franchiseCount = franchiseStores.length;
+            const franchisePct = total > 0 ? (franchiseCount / total * 100) : 0;
+
+            // 업종 다양성 지수 (허핀달-허쉬만 지수 기반, 0~100으로 정규화. 높을수록 다양함)
+            const hhi = categoryBreakdown.reduce((sum, c) => sum + Math.pow(c.pct / 100, 2), 0);
+            const diversityScore = Math.round((1 - hhi) * 100);
+
+            // 중심점 기준 상대 좌표(미터) — 밀집도 시각화용. 위경도 차이를 근사적으로 미터로 환산한다.
+            const latRad = (centerLat || 0) * Math.PI / 180;
+            const points = stores.map(s => {
+                const lat = parseFloat(s.lat || s.y);
+                const lng = parseFloat(s.lon || s.lng || s.x);
+                if (isNaN(lat) || isNaN(lng)) return null;
+                const dx = (lng - centerLng) * 111320 * Math.cos(latRad);
+                const dy = (centerLat - lat) * 110540; // 위쪽이 북쪽이 되도록 부호 반전
+                return { dx, dy, category: getFoodCategory(s.indsSclsNm, s.indsLclsNm, s.bizesNm, s.indsMclsNm) || '기타', name: s.bizesNm };
+            }).filter(Boolean);
+
+            // 건물(주소)당 평균 입점 음식점 수 — 같은 건물/상가에 음식점이 여러 개 몰려있는지 보여준다.
+            // (참고: "최근접 거리" 지표는 같은 건물의 여러 업소가 좌표상 거의 동일 지점으로 등록되는 경우가
+            //  많아서 값이 비정상적으로 작게 나와 의미가 없었다. 그 현상 자체를 지표로 바꿨다.)
+            const addressCounts = {};
+            stores.forEach(s => {
+                const addr = (s.rdnmAdr || s.lnoAdr || '').trim();
+                if (!addr) return;
+                addressCounts[addr] = (addressCounts[addr] || 0) + 1;
+            });
+            const uniqueAddressCount = Object.keys(addressCounts).length;
+            const avgStoresPerBuilding = uniqueAddressCount > 0 ? total / uniqueAddressCount : 0;
+            const multiTenantBuildings = Object.values(addressCounts).filter(c => c >= 3).length;
+
+            // 도보 접근성 (실제 좌표 기반 거리 buckets을 도보 시간으로 환산 — 성인 평균 도보속도 약 67m/분 기준)
+            const walkBuckets = [
+                { label: '도보 5분 이내 (~350m)', max: 350, count: 0 },
+                { label: '도보 10분 이내 (~670m)', max: 670, count: 0 },
+                { label: '도보 15분 이내 (~1000m)', max: 1000, count: 0 },
+            ];
+            stores.forEach(s => {
+                const d = typeof s.distanceMeters === 'number' ? s.distanceMeters : null;
+                if (d === null) return;
+                walkBuckets.forEach(b => { if (d <= b.max) b.count++; });
+            });
+
+            // 동/가 단위 분포 — 도로명주소에서 "OO동"/"OO가"를 추출해 반경이 여러 행정동에 걸칠 때 분포를 보여준다.
+            const dongCounts = {};
+            stores.forEach(s => {
+                const addr = s.rdnmAdr || s.lnoAdr || '';
+                const match = addr.match(/([가-힣]+(?:\d+가|동))/);
+                if (match) {
+                    const dong = match[1];
+                    dongCounts[dong] = (dongCounts[dong] || 0) + 1;
+                }
+            });
+            const dongBreakdown = Object.entries(dongCounts)
+                .map(([name, count]) => ({ name, count }))
+                .sort((a, b) => b.count - a.count)
+                .slice(0, 6);
+
+            // 프랜차이즈 TOP 브랜드 (브랜드명 = 지점명을 뗀 상호명, 예: "교촌치킨 강남점" -> "교촌치킨")
+            const brandCounts = {};
+            franchiseStores.forEach(s => {
+                let brand = (s.bizesNm || '').trim();
+                const branch = (s.brchNm || '').trim();
+                if (branch && brand.endsWith(branch)) brand = brand.slice(0, -branch.length).trim();
+                if (!brand) return;
+                brandCounts[brand] = (brandCounts[brand] || 0) + 1;
+            });
+            const topBrands = Object.entries(brandCounts)
+                .map(([name, count]) => ({ name, count }))
+                .sort((a, b) => b.count - a.count)
+                .slice(0, 5);
+
+            return { total, densityPerKm2, areaKm2, categoryBreakdown, franchiseCount, franchisePct, diversityScore, points, uniqueAddressCount, avgStoresPerBuilding, multiTenantBuildings, walkBuckets, dongBreakdown, topBrands };
+        }
+
+        let categoryChartInstance = null;
+        let categoryPieChartInstance = null;
+
+        function renderTradeAreaAnalysis() {
             const dashboardContainer = document.getElementById('dashboard-content');
             const coordsText = document.getElementById('analysis-coords-text');
-            
-            coordsText.innerHTML = `위도: ${currentLat.toFixed(5)}, 경도: ${currentLng.toFixed(5)}<br>📍 주소: ${currentAddressStr}`;
-            dashboardContainer.innerHTML = `<div style="background: white; padding: 16px; border-radius: 10px; border: 1px solid #e2e8f0; text-align: center; color: #2563eb; font-size: 13px;">🔄 분석 서버에서 심층 연산 중입니다...</div>`;
+            coordsText.innerHTML = `<strong>${currentAddressStr}</strong><br><span style="font-size:12px; color:#64748b;">위도 ${currentLat.toFixed(5)}, 경도 ${currentLng.toFixed(5)} (참고정보) · 반경 ${radius >= 1000 ? (radius/1000)+'km' : radius+'m'}</span>`;
 
-            try {
-                
-                const response = await fetch('/api/v1/analysis/execute', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ lat: currentLat, lng: currentLng, module_id: mode, radius: 400 })
-                });
+            if (!currentStores || currentStores.length === 0) {
+                const rawCount = (window.__lastRawItems || []).length;
+                if (rawCount > 0) {
+                    dashboardContainer.innerHTML = `<div style="background: white; padding: 16px; border-radius: 10px; border: 1px solid #e2e8f0; text-align: center; color: #64748b; font-size: 15px;">
+                        이 반경 안의 등록 업소 ${rawCount}건 중 음식점으로 분류된 곳이 없습니다.<br>
+                        <span style="font-size:13px;">반경을 넓히거나 다른 위치를 확인해보세요.</span>
+                    </div>`;
+                } else {
+                    dashboardContainer.innerHTML = `<div style="background: white; padding: 16px; border-radius: 10px; border: 1px solid #e2e8f0; text-align: center; color: #64748b; font-size: 15px;">지도에서 위치를 이동하면 데이터를 불러옵니다.</div>`;
+                }
+                return;
+            }
 
+            const metrics = computeTradeAreaMetrics(currentStores, radius, currentLat, currentLng);
 
-                const json = await response.json();
-                if (json.status !== 'success') throw new Error('서버 연산 실패');
+            // 일반인 대상 요약 문장 — 숫자만 나열하지 않고 말로 풀어서 한눈에 감이 오게 한다.
+            const topCat = metrics.categoryBreakdown[0];
+            const densityFeel = metrics.densityPerKm2 > 800 ? '매우 밀집된' : metrics.densityPerKm2 > 300 ? '적당히 밀집된' : '한산한';
+            const diversityFeel = metrics.diversityScore >= 70 ? '메뉴 선택지가 다양한' : metrics.diversityScore >= 40 ? '어느 정도 다양한' : '특정 업종에 쏠린';
+            const summarySentence = `이 지역은 <strong>${densityFeel} 상권</strong>이고, <strong>${topCat ? topCat.name : '음식점'}</strong>이 가장 많으며(${topCat ? topCat.pct.toFixed(0) : 0}%), 전체적으로 <strong>${diversityFeel}</strong> 편입니다. 프랜차이즈 비중은 <strong>${metrics.franchisePct.toFixed(0)}%</strong>입니다.`;
 
-                const res = json.result;
-                let html = '';
+            let html = `
+                <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:14px; font-size:14px; color:#166534; line-height:1.6;">
+                    💬 ${summarySentence}
+                </div>
 
-                const getPercent = (val, max) => Math.min(Math.round((val / max) * 100), 100);
-
-                html += `
-                    <div style="background: #fff3cd; border: 1px solid #ffe69c; color: #997404; border-radius: 8px; padding: 10px 14px; font-size: 12px; line-height:1.5; margin-bottom: 4px;">
-                        ⚠️ <strong>시뮬레이션 데이터입니다.</strong> 아래 수치는 실제 공공데이터 기반 분석이 아니라 데모용 예시 값입니다. 실제 창업/투자 판단에 사용하지 마세요.
+                <div class="analysis-metric-grid">
+                    <div class="analysis-card">
+                        <h5>반경 내 음식점 수</h5>
+                        <p>${metrics.total.toLocaleString()}개</p>
                     </div>
-                    <div style="font-size: 15px; font-weight: bold; color: #1e293b; margin-bottom: 2px;">📈 ${res.title}</div>
-                    <div class="analysis-metric-grid">
-                        <div class="analysis-card">
-                            <h5>대중교통 인프라</h5>
-                            <p>${res.transit_count || 0}개소</p>
-                            <div class="metric-bar-bg"><div class="metric-bar-fill" style="width: ${getPercent(res.transit_count || 0, 20)}%;"></div></div>
+                    <div class="analysis-card">
+                        <h5>업소 밀도</h5>
+                        <p>${metrics.densityPerKm2.toFixed(1)}개/㎢</p>
+                        <div style="font-size:10px; color:#94a3b8; margin-top:2px;">분석 면적 ${metrics.areaKm2.toFixed(2)}㎢ 기준 환산값</div>
+                    </div>
+                    <div class="analysis-card">
+                        <h5>프랜차이즈 비율</h5>
+                        <p>${metrics.franchisePct.toFixed(0)}%</p>
+                        <div class="metric-bar-bg"><div class="metric-bar-fill" style="width:${metrics.franchisePct}%; background:#f59e0b;"></div></div>
+                    </div>
+                    <div class="analysis-card">
+                        <h5>업종 다양성 지수</h5>
+                        <p>${metrics.diversityScore}/100</p>
+                        <div class="metric-bar-bg"><div class="metric-bar-fill" style="width:${metrics.diversityScore}%; background:#10b981;"></div></div>
+                    </div>
+                    <div class="analysis-card">
+                        <h5>건물당 평균 입점 수</h5>
+                        <p>${metrics.avgStoresPerBuilding.toFixed(1)}개</p>
+                        <div style="font-size:10px; color:#94a3b8; margin-top:2px;">복합상가(3개↑) ${metrics.multiTenantBuildings}곳</div>
+                    </div>
+                </div>
+
+                <div style="background:white; padding:16px; border-radius:10px; border:1px solid #e2e8f0;">
+                    <div style="font-size:16px; font-weight:bold; color:#1e293b; margin-bottom:10px;">🚶 도보 접근성</div>
+                    ${metrics.walkBuckets.map(b => `
+                        <div style="margin-bottom:8px;">
+                            <div style="display:flex; justify-content:space-between; font-size:13px; color:#334155; margin-bottom:3px;">
+                                <span>${b.label}</span>
+                                <span>${b.count}개</span>
+                            </div>
+                            <div class="metric-bar-bg"><div class="metric-bar-fill" style="width:${metrics.total > 0 ? (b.count / metrics.total * 100) : 0}%; background:#0ea5e9;"></div></div>
                         </div>
-                        <div class="analysis-card">
-                            <h5>시간당 유동인구</h5>
-                            <p>${res.estimated_hourly_foot_traffic ? res.estimated_hourly_foot_traffic.toLocaleString() : 0}명</p>
-                            <div class="metric-bar-bg"><div class="metric-bar-fill" style="width: ${getPercent(res.estimated_hourly_foot_traffic || 0, 5000)}%; background: #3b82f6;"></div></div>
+                    `).join('')}
+                    <div style="font-size:11px; color:#94a3b8; margin-top:4px;">※ 성인 평균 도보속도(약 67m/분) 기준 추정치입니다.</div>
+                </div>
+
+                <div style="background:white; padding:16px; border-radius:10px; border:1px solid #e2e8f0;">
+                    <div style="font-size:16px; font-weight:bold; color:#1e293b; margin-bottom:4px;">🎯 업종별 경쟁 포화도</div>
+                    <div style="font-size:12px; color:#94a3b8; margin-bottom:10px;">막대가 길수록 그 업종의 경쟁이 치열하다는 뜻입니다. 오른쪽은 전체 대비 비중입니다.</div>
+                    <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                        <div style="flex:1.4; min-width:180px; position:relative; height:${Math.max(160, metrics.categoryBreakdown.length * 30)}px;">
+                            <canvas id="category-bar-chart"></canvas>
                         </div>
-                        <div class="analysis-card">
-                            <h5>동종 경쟁 점포</h5>
-                            <p>${res.competitor_count || 0}개소</p>
-                            <div class="metric-bar-bg"><div class="metric-bar-fill" style="width: ${getPercent(res.competitor_count || 0, 50)}%; background: #f59e0b;"></div></div>
+                        <div style="flex:1; min-width:140px; position:relative; height:${Math.max(160, metrics.categoryBreakdown.length * 30)}px;">
+                            <canvas id="category-pie-chart"></canvas>
                         </div>
-                        <div class="analysis-card">
-                            <h5>경쟁사 평균 평점</h5>
-                            <p>${res.average_rating || 0} / 5.0</p>
-                            <div class="metric-bar-bg"><div class="metric-bar-fill" style="width: ${((res.average_rating || 0) / 5) * 100}%; background: #10b981;"></div></div>
-                        </div>
-                        <div class="analysis-card">
-                            <h5>주중 직장인 상주</h5>
-                            <p>${res.estimated_office_workers ? res.estimated_office_workers.toLocaleString() : 0}명</p>
-                            <div class="metric-bar-bg"><div class="metric-bar-fill" style="width: ${getPercent(res.estimated_office_workers || 0, 10000)}%;"></div></div>
-                        </div>
-                        <div class="analysis-card">
-                            <h5>주거 배후 인구</h5>
-                            <p>${res.estimated_residents ? res.estimated_residents.toLocaleString() : 0}명</p>
-                            <div class="metric-bar-bg"><div class="metric-bar-fill" style="width: ${getPercent(res.estimated_residents || 0, 10000)}%;"></div></div>
-                        </div>
-                        <div class="analysis-card">
-                            <h5>예상 월 매출</h5>
-                            <p style="color: #e03131;">${res.expected_monthly_revenue ? (res.expected_monthly_revenue / 10000).toLocaleString() : 0} 만원</p>
-                            <div class="metric-bar-bg"><div class="metric-bar-fill" style="width: ${getPercent(res.expected_monthly_revenue || 0, 100000000)}%; background: #ef4444;"></div></div>
-                        </div>
-                        <div class="analysis-card">
-                            <h5>투자 원금 회수 (BEP)</h5>
-                            <p style="color: #2b8a3e;">${res.bep_months || 0}개월</p>
-                            <div class="metric-bar-bg"><div class="metric-bar-fill" style="width: ${Math.max(100 - ((res.bep_months || 12) / 36) * 100, 10)}%; background: #10b981;"></div></div>
+                    </div>
+                </div>
+
+                <div style="background:white; padding:16px; border-radius:10px; border:1px solid #e2e8f0;">
+                    <div style="font-size:16px; font-weight:bold; color:#1e293b; margin-bottom:4px;">📍 중심점 기준 밀집도</div>
+                    <div style="font-size:12px; color:#94a3b8; margin-bottom:10px;">가운데 ★가 분석 중심점입니다. 점이 중심에 몰려있을수록 접근성이 좋은 곳에 밀집돼 있다는 뜻입니다.</div>
+                    <div id="density-radar-container" style="width:100%; aspect-ratio:1/1; max-width:320px; margin:0 auto;"></div>
+                </div>
+            `;
+
+            if (metrics.dongBreakdown.length > 1) {
+                html += `
+                    <div style="background:white; padding:16px; border-radius:10px; border:1px solid #e2e8f0;">
+                        <div style="font-size:16px; font-weight:bold; color:#1e293b; margin-bottom:10px;">🗺️ 행정동별 분포</div>
+                        ${metrics.dongBreakdown.map(d => `
+                            <div style="margin-bottom:8px;">
+                                <div style="display:flex; justify-content:space-between; font-size:13px; color:#334155; margin-bottom:3px;">
+                                    <span>${d.name}</span>
+                                    <span>${d.count}개</span>
+                                </div>
+                                <div class="metric-bar-bg"><div class="metric-bar-fill" style="width:${(d.count / metrics.total * 100)}%; background:#8b5cf6;"></div></div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+
+            if (metrics.topBrands.length > 0) {
+                html += `
+                    <div style="background:white; padding:16px; border-radius:10px; border:1px solid #e2e8f0;">
+                        <div style="font-size:16px; font-weight:bold; color:#1e293b; margin-bottom:10px;">🏪 프랜차이즈 TOP ${metrics.topBrands.length}</div>
+                        ${metrics.topBrands.map((b, i) => `
+                            <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; ${i > 0 ? 'border-top:1px solid #f1f5f9;' : ''}">
+                                <span style="font-size:14px; color:#334155;">${i + 1}. ${b.name}</span>
+                                <span style="font-size:13px; color:#64748b; font-weight:bold;">${b.count}개</span>
+                            </div>
+                        `).join('')}
+                        <div style="font-size:11px; color:#94a3b8; margin-top:8px;">※ 지점명(브랜드+지점) 등록 여부 기준 근사치입니다.</div>
+                    </div>
+                `;
+            }
+
+            const historyCard = renderHistoryComparison(currentLat, currentLng, metrics);
+            if (historyCard) html += historyCard;
+
+            if (window.__lastFetchTruncated) {
+                html += `<div style="font-size:12px; color:#94a3b8; text-align:center;">⚠️ 이 반경에 업소가 너무 많아 일부만 반영된 결과입니다. 반경을 줄이면 더 정확합니다.</div>`;
+            }
+
+            dashboardContainer.innerHTML = html;
+
+            // ── 차트 렌더링 (Chart.js) ──
+            if (typeof Chart !== 'undefined') {
+                const palette = ['#2563eb', '#f59e0b', '#10b981', '#8b5cf6', '#ef4444', '#06b6d4', '#ec4899', '#84cc16', '#f97316', '#6366f1', '#14b8a6'];
+
+                if (categoryChartInstance) categoryChartInstance.destroy();
+                const barCtx = document.getElementById('category-bar-chart');
+                if (barCtx) {
+                    categoryChartInstance = new Chart(barCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: metrics.categoryBreakdown.map(c => c.name),
+                            datasets: [{
+                                data: metrics.categoryBreakdown.map(c => c.count),
+                                backgroundColor: metrics.categoryBreakdown.map((_, i) => palette[i % palette.length]),
+                                borderRadius: 4,
+                            }],
+                        },
+                        options: {
+                            indexAxis: 'y',
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: { callbacks: { label: (ctx) => `${ctx.raw}개 (${metrics.categoryBreakdown[ctx.dataIndex].pct.toFixed(1)}%)` } },
+                            },
+                            scales: { x: { beginAtZero: true, ticks: { precision: 0 } } },
+                        },
+                    });
+                }
+
+                if (categoryPieChartInstance) categoryPieChartInstance.destroy();
+                const pieCtx = document.getElementById('category-pie-chart');
+                if (pieCtx) {
+                    categoryPieChartInstance = new Chart(pieCtx, {
+                        type: 'pie',
+                        data: {
+                            labels: metrics.categoryBreakdown.map(c => c.name),
+                            datasets: [{
+                                data: metrics.categoryBreakdown.map(c => c.count),
+                                backgroundColor: metrics.categoryBreakdown.map((_, i) => palette[i % palette.length]),
+                            }],
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } },
+                                tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${ctx.raw}개 (${metrics.categoryBreakdown[ctx.dataIndex].pct.toFixed(1)}%)` } },
+                            },
+                        },
+                    });
+                }
+            }
+
+            // ── 중심점 기준 밀집도 (막대그래프로는 "밀집도" 느낌이 안 나서, 실제 상대 위치를 그대로 점으로 찍는 방사형 시각화로 대체) ──
+            renderDensityRadar(metrics.points, radius);
+        }
+
+        // 중심점을 원점에 두고 각 업소를 실제 상대 위치(dx, dy, 미터)에 점으로 찍는다.
+        // 점들이 중심에 몰려 있으면 접근성 좋은 곳에 밀집, 바깥쪽에 퍼져 있으면 넓게 분산된 상권이라는 뜻.
+        function renderDensityRadar(points, radiusM) {
+            const container = document.getElementById('density-radar-container');
+            if (!container) return;
+
+            const size = 300;
+            const cx = size / 2, cy = size / 2;
+            const maxR = size / 2 - 12;
+            const scale = maxR / radiusM;
+            const ringVals = [0.33, 0.66, 1.0];
+
+            const dotColor = { '한식': '#2563eb', '카페/디저트': '#f59e0b', '치킨': '#ef4444' };
+
+            let svg = `<svg viewBox="0 0 ${size} ${size}" style="width:100%; height:100%;">`;
+            // 참고용 동심원 (반경의 33%/66%/100% 지점)
+            ringVals.forEach(r => {
+                svg += `<circle cx="${cx}" cy="${cy}" r="${maxR * r}" fill="none" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="3,3"/>`;
+                svg += `<text x="${cx + maxR * r + 3}" y="${cy - 3}" font-size="9" fill="#94a3b8">${Math.round(radiusM * r)}m</text>`;
+            });
+            // 업소 점들
+            points.forEach(p => {
+                const px = cx + p.dx * scale;
+                const py = cy + p.dy * scale;
+                if (px < 0 || px > size || py < 0 || py > size) return;
+                const color = dotColor[p.category] || '#64748b';
+                svg += `<circle cx="${px}" cy="${py}" r="3.5" fill="${color}" fill-opacity="0.65" stroke="white" stroke-width="0.5"><title>${p.name || ''}</title></circle>`;
+            });
+            // 중심점 (★)
+            svg += `<circle cx="${cx}" cy="${cy}" r="6" fill="#1e293b"/>`;
+            svg += `<text x="${cx}" y="${cy + 4}" font-size="9" fill="white" text-anchor="middle">★</text>`;
+            svg += `</svg>`;
+            container.innerHTML = svg;
+        }
+
+        // ── 과거 대비 변화 추적 ──
+        // 진짜 "과거" 통계 공공데이터는 존재하지 않는다(무료 공공데이터엔 시계열이 없음).
+        // 그래서 거짓으로 과거 수치를 만들어내는 대신, 이 기기에서 같은 위치를 분석할 때마다
+        // 스냅샷을 저장해두고, 다음에 재방문했을 때 "지난 방문 대비" 변화를 정직하게 비교해서 보여준다.
+        // 처음 보는 위치는 비교 대상이 없으니 카드 자체가 안 뜬다.
+        const HISTORY_KEY = 'foodmap_history_v1';
+        const HISTORY_MIN_GAP_MS = 6 * 60 * 60 * 1000; // 같은 세션 중복 저장 방지 (6시간 이내 재저장 안 함)
+
+        function getLocationGridKey(lat, lng) {
+            // 소수점 3자리 ≈ 약 110m 격자. 같은 반경을 다시 봤다고 인식할 정도의 정밀도.
+            return `${lat.toFixed(3)}_${lng.toFixed(3)}`;
+        }
+
+        function renderHistoryComparison(lat, lng, metrics) {
+            let history;
+            try {
+                history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '{}');
+            } catch (e) {
+                history = {};
+            }
+
+            const key = getLocationGridKey(lat, lng);
+            const entries = history[key] || [];
+            const now = Date.now();
+            const lastEntry = entries[entries.length - 1];
+
+            let comparisonHtml = null;
+            if (lastEntry && (now - lastEntry.t) > HISTORY_MIN_GAP_MS) {
+                const totalDiff = metrics.total - lastEntry.total;
+                const franchiseDiff = metrics.franchisePct - lastEntry.franchisePct;
+                const daysAgo = Math.max(1, Math.round((now - lastEntry.t) / (24 * 60 * 60 * 1000)));
+                const arrow = (v) => v > 0 ? `▲ ${Math.abs(v).toFixed(v < 1 ? 1 : 0)}` : (v < 0 ? `▼ ${Math.abs(v).toFixed(v < 1 ? 1 : 0)}` : '변화없음');
+                comparisonHtml = `
+                    <div style="background:white; padding:16px; border-radius:10px; border:1px solid #e2e8f0;">
+                        <div style="font-size:16px; font-weight:bold; color:#1e293b; margin-bottom:4px;">🕰️ 지난 방문 대비 변화</div>
+                        <div style="font-size:11px; color:#94a3b8; margin-bottom:10px;">${daysAgo}일 전 이 위치를 분석했던 기록과 비교했습니다 (이 기기 기준).</div>
+                        <div style="display:flex; gap:16px;">
+                            <div style="flex:1;">
+                                <div style="font-size:12px; color:#64748b;">음식점 수</div>
+                                <div style="font-size:15px; font-weight:bold; color:${totalDiff > 0 ? '#dc2626' : totalDiff < 0 ? '#2563eb' : '#64748b'};">${arrow(totalDiff)}개</div>
+                            </div>
+                            <div style="flex:1;">
+                                <div style="font-size:12px; color:#64748b;">프랜차이즈 비율</div>
+                                <div style="font-size:15px; font-weight:bold; color:${franchiseDiff > 0 ? '#dc2626' : franchiseDiff < 0 ? '#2563eb' : '#64748b'};">${arrow(franchiseDiff)}%p</div>
+                            </div>
                         </div>
                     </div>
                 `;
-
-                if (res.detailed_explanation) {
-                    // 항목별 내용을 파싱하여 좌측 정렬 및 들여쓰기 구조화된 HTML 블록으로 변환
-                    let rawText = res.detailed_explanation;
-                    let blocks = rawText.split('-');
-                    let formattedHtml = '';
-
-                    blocks.forEach(b => {
-                        let trimmed = b.trim();
-                        if (!trimmed) return;
-                        let parts = trimmed.split(':');
-                        if (parts.length >= 2) {
-                            let title = parts[0].trim();
-                            let desc = parts.slice(1).join(':').trim();
-                            formattedHtml += `
-                                <div class="report-section-block">
-                                    <span class="report-section-title">📌 ${title}</span>
-                                    <p class="report-section-desc">${desc}</p>
-                                </div>
-                            `;
-                        } else {
-                            formattedHtml += `<p class="report-section-desc" style="margin-bottom:8px;">${trimmed}</p>`;
-                        }
-                    });
-
-                    html += `
-                        <div style="margin-top: 4px;">
-                            <div style="font-size: 13px; font-weight: bold; color: #2563eb; margin-bottom: 6px;">📋 전문가 심층 산출 근거 및 데이터 검증 리포트</div>
-                            <div class="explanation-box">${formattedHtml}</div>
-                        </div>
-                    `;
-                }
-
-                dashboardContainer.innerHTML = html;
-            } catch (error) {
-                dashboardContainer.innerHTML = `<div style="background: white; padding: 16px; border-radius: 10px; border: 1px solid #fecaca; text-align: center; color: #ef4444; font-size: 13px;">⚠️ 분석 서버 연결 실패<br><span style="font-size:11px; color:#64748b;">서버가 구동 중인지 확인해주세요.</span></div>`;
             }
+
+            // 새 스냅샷 저장 (같은 세션 중복 저장 방지)
+            if (!lastEntry || (now - lastEntry.t) > HISTORY_MIN_GAP_MS) {
+                entries.push({ t: now, total: metrics.total, franchisePct: metrics.franchisePct, topCategory: metrics.categoryBreakdown[0]?.name || null });
+                history[key] = entries.slice(-10); // 위치당 최근 10개까지만 보관
+                try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); } catch (e) {}
+            }
+
+            return comparisonHtml;
         }
 
-        // --- 기존 맛집 탐색 및 지도 스크립트 ---
+
         function getMapSearchUrl(storeName, address) {
             const platform = document.getElementById('map-platform-select') ? document.getElementById('map-platform-select').value : 'google';
             const query = encodeURIComponent(`${address} ${storeName}`);
@@ -537,7 +868,13 @@
             const mapContainer = document.getElementById('map');
             const dragHandle = document.getElementById('drag-handle');
             const sidebarHeader = document.getElementById('sidebar-header-toggle');
+            const sidebarHeaderExplore = document.getElementById('sidebar-header-toggle-explore');
             const sizeToggleArrowBtn = document.getElementById('size-toggle-arrow-btn');
+
+            const openExploreBtn = document.getElementById('open-explore-btn');
+            if (openExploreBtn) openExploreBtn.onclick = () => openExplorePanel();
+            const closeExploreBtn = document.getElementById('close-explore-btn');
+            if (closeExploreBtn) closeExploreBtn.onclick = (e) => { e.stopPropagation(); closeExplorePanel(); };
 
             // ── 데스크톱 사이드바: 마우스로 드래그해서 폭 조절 (조절한 폭은 자동으로 기억됨) ──
             const sidebarResizeHandle = document.getElementById('sidebarResizeHandle');
@@ -600,12 +937,13 @@
                 if (window.innerWidth <= 768) {
                     currentHeightIndex = (currentHeightIndex + 1) % peekLevelsVh.length;
                     sidebar.style.transform = `translateY(${visibleVhToTranslateY(peekLevelsVh[currentHeightIndex])})`;
-                    sizeToggleArrowBtn.textContent = (currentHeightIndex === 2) ? '▼' : '▲';
+                    if (sizeToggleArrowBtn) sizeToggleArrowBtn.textContent = (currentHeightIndex === 2) ? '▼' : '▲';
                 }
             }
 
             if (dragHandle) dragHandle.onclick = toggleWindowSize;
             if (sidebarHeader) sidebarHeader.onclick = toggleWindowSize;
+            if (sidebarHeaderExplore) sidebarHeaderExplore.onclick = toggleWindowSize;
             if (sizeToggleArrowBtn) {
                 sizeToggleArrowBtn.onclick = function(e) {
                     e.stopPropagation();
@@ -617,6 +955,9 @@
             let startTranslatePx = 0;
             let isDragging = false;
             let listDragCandidate = false; // 리스트 맨 위에서 touchstart 했는지 여부
+            let lastMoveY = 0;
+            let lastMoveTime = 0;
+            let dragVelocity = 0; // px/ms, 양수 = 아래로 내려가는 속도
 
             function getCurrentTranslatePx() {
                 // 현재 적용된 transform 값을 px 단위로 읽어온다 (transition 중이어도 현재 렌더링된 값 그대로)
@@ -632,11 +973,18 @@
                 return 0;
             }
 
+            function translateToVisibleVh(px) {
+                return SHEET_HEIGHT_VH - (px / window.innerHeight * 100);
+            }
+
             function onDragStart(clientY) {
                 if (window.innerWidth > 768) return;
                 isDragging = true;
                 startY = clientY;
                 startTranslatePx = getCurrentTranslatePx();
+                lastMoveY = clientY;
+                lastMoveTime = performance.now();
+                dragVelocity = 0;
                 // 드래그 중엔 transition을 끈다 — 손가락을 그대로 즉시 따라가야 자연스럽다.
                 // (transition이 걸린 채로 값을 계속 바꾸면 매 프레임 애니메이션이 밀려서 무겁게 느껴진다)
                 sidebar.style.transition = 'none';
@@ -644,6 +992,12 @@
 
             function onDragMove(clientY) {
                 if (!isDragging) return;
+                const now = performance.now();
+                const dt = now - lastMoveTime;
+                if (dt > 0) dragVelocity = (clientY - lastMoveY) / dt; // px/ms
+                lastMoveY = clientY;
+                lastMoveTime = now;
+
                 const deltaY = clientY - startY; // 손가락이 아래로 내려간 만큼 시트도 아래로
                 let newTranslatePx = startTranslatePx + deltaY;
 
@@ -658,10 +1012,38 @@
                 sidebar.style.transform = `translateY(${newTranslatePx}px)`;
             }
 
+            // 손을 뗀 자리에 그냥 멈추는 대신, 가장 가까운 단계(접힘/중간/펼침)로 딱 붙게 스냅한다.
+            // 빠르게 휙 쓸어내리면(속도가 충분히 빠르면) 방향으로 한 단계 확실히 이동시켜서
+            // "쓸어내리면 창이 내려간다"는 느낌이 분명하게 들도록 한다.
             function onDragEnd() {
                 if (!isDragging) return;
                 isDragging = false;
                 sidebar.style.transition = 'transform 0.3s cubic-bezier(0.25, 1, 0.5, 1)';
+
+                const currentPx = getCurrentTranslatePx();
+                const currentVisibleVh = translateToVisibleVh(currentPx);
+                const FLING_VELOCITY = 0.5; // px/ms 이상이면 "휙 쓸었다"고 판단
+
+                let targetIndex;
+                if (dragVelocity > FLING_VELOCITY) {
+                    // 빠르게 아래로 스와이프 -> 한 단계 접기 (더 접을 게 없으면 최소 단계 유지)
+                    targetIndex = Math.max(0, currentHeightIndex - 1);
+                } else if (dragVelocity < -FLING_VELOCITY) {
+                    // 빠르게 위로 스와이프 -> 한 단계 펼치기
+                    targetIndex = Math.min(peekLevelsVh.length - 1, currentHeightIndex + 1);
+                } else {
+                    // 느린 드래그였다면 가장 가까운 단계로 스냅
+                    targetIndex = 0;
+                    let minDiff = Infinity;
+                    peekLevelsVh.forEach((vh, idx) => {
+                        const diff = Math.abs(vh - currentVisibleVh);
+                        if (diff < minDiff) { minDiff = diff; targetIndex = idx; }
+                    });
+                }
+
+                currentHeightIndex = targetIndex;
+                sidebar.style.transform = `translateY(${visibleVhToTranslateY(peekLevelsVh[targetIndex])})`;
+                if (sizeToggleArrowBtn) sizeToggleArrowBtn.textContent = (targetIndex === peekLevelsVh.length - 1) ? '▼' : '▲';
             }
 
             // 상단 손잡이(얇은 바)뿐 아니라 헤더 영역 전체를 잡아도 드래그되게 한다 —
@@ -740,7 +1122,7 @@
             }
 
             let currentZoom = 16; // 초기 진입 시에도 좁은 반경(400m)으로 시작해서 첫 로딩을 빠르게 한다
-            let radius = getRadiusByZoom(currentZoom);
+            radius = getRadiusByZoom(currentZoom); // 전역 변수에 대입 (재선언하면 분석 탭에서 다시 못 봄)
 
             const map = new google.maps.Map(mapContainer, {
                 center: { lat: centerLat, lng: centerLng },
@@ -782,7 +1164,7 @@
                 })
                 : null;
             let activePopupOverlay = null;
-            let currentStores = []; 
+            currentStores = []; // 전역 변수 사용 (재선언하면 분석 탭에서 다시 못 봄)
             let isAllCollapsed = false;
             let isWishlistMode = false;
             
@@ -914,75 +1296,6 @@
                 return { rating: (4.0 + (hashVal % 11) * 0.1).toFixed(1), reviewCount: (hashVal % 85) + 8 };
             }
 
-            // 음식 카테고리 표시 순서 (고정) — 나머지(목록에 없는 값)는 뒤쪽에 개수 많은 순으로 붙는다.
-            const CATEGORY_ORDER = ['한식', '중식', '일식/회', '양식', '분식', '치킨', '패스트푸드', '카페/디저트', '제과/베이커리', '주점/술집', '기타 음식점'];
-
-            // 공공데이터 중분류명(indsMclsNm)을 화면 표시용 카테고리로 정리한다.
-            // 상호명 텍스트 추측이 아니라 데이터가 제공하는 공식 분류값을 그대로 신뢰하는 게 원칙.
-            function normalizeMclsCategory(mclsNm) {
-                const m = (mclsNm || '').trim();
-                if (!m) return null;
-                if (m.includes('한식')) return '한식';
-                if (m.includes('중식')) return '중식';
-                if (m.includes('일식')) return '일식/회';
-                if (m.includes('서양식') || m.includes('양식')) return '양식';
-                if (m.includes('분식')) return '분식';
-                if (m.includes('치킨') || m.includes('닭') || m.includes('오리')) return '치킨';
-                if (m.includes('패스트푸드') || m.includes('피자') || m.includes('햄버거') || m.includes('샌드위치')) return '패스트푸드';
-                if (m.includes('커피') || m.includes('카페') || m.includes('음료') || m.includes('디저트')) return '카페/디저트';
-                if (m.includes('제과') || m.includes('베이커리') || m.includes('빵')) return '제과/베이커리';
-                if (m.includes('주점') || m.includes('호프') || m.includes('술집')) return '주점/술집';
-                // 매핑 목록에 없는 중분류는 추측해서 억지로 끼워 맞추지 않고,
-                // 데이터에 있는 값 그대로 노출한다 (예: "기타 간이 음식점업" 등).
-                return m;
-            }
-
-            function getFoodCategory(indsSclsNm, indsLclsNm, storeName, indsMclsNm) {
-                const text = ((indsSclsNm || '') + ' ' + (indsLclsNm || '') + ' ' + (storeName || '')).toLowerCase();
-                const excludeKeywords = ['부동산', '중개', '미용', '헤어', '뷰티', '피부', '사우나', '세탁', 'pc방', '약국', '병원', '의원', '학원', '주유소', '헬스', '정비', '안경', '의류', '꽃집', '애완', '인테리어', '사진', '공방', '세무', '교회', '사찰', '마사지'];
-                for (const kw of excludeKeywords) if (text.includes(kw)) return null;
-
-                // 1차 판단: 대분류명이 정확히 "음식"이면 무조건 음식점으로 취급한다.
-                // 상호명에 음식 관련 단어가 전혀 없어도(예: "유리네") 이 필드가 신뢰의 기준이다.
-                const isFoodByLclsNm = (indsLclsNm || '').trim() === '음식';
-
-                const foodCheckKeywords = ['식당', '음식', '요리', '한식', '중식', '일식', '양식', '분식', '구이', '찌개', '국밥', '회', '초밥', '고기', '냉면', '백반', '면', '족발', '보쌈', '치킨', '호프', '주점', '카페', '커피', '빵', '피자', '햄버거'];
-                let isFoodByKeyword = false;
-                for (const fk of foodCheckKeywords) { if (text.includes(fk)) { isFoodByKeyword = true; break; } }
-
-                // 대분류명이 아예 없는(데이터 누락) 경우에만 키워드 매칭으로 보조 판단한다.
-                const isFood = isFoodByLclsNm || (!indsLclsNm && isFoodByKeyword);
-                if (!isFood) return null;
-
-                // 2차 판단: 세부 카테고리는 공식 중분류명(indsMclsNm)을 우선 신뢰한다.
-                const byMcls = normalizeMclsCategory(indsMclsNm);
-                if (byMcls) return byMcls;
-
-                // 중분류명 자체가 없는 예외적인 경우에만 키워드 기반 보조 분류를 쓴다.
-                if (text.includes('한식') || text.includes('국밥') || text.includes('백반') || text.includes('삼겹살') || text.includes('찌개') || text.includes('갈비') || text.includes('냉면')) return '한식';
-                if (text.includes('중식') || text.includes('짜장') || text.includes('짬뽕')) return '중식';
-                if (text.includes('일식') || text.includes('초밥') || text.includes('돈가스')) return '일식/회';
-                if (text.includes('양식') || text.includes('스테이크') || text.includes('파스타')) return '양식';
-                if (text.includes('피자') || text.includes('햄버거')) return '패스트푸드';
-                if (text.includes('커피') || text.includes('카페') || text.includes('디저트')) return '카페/디저트';
-                if (text.includes('빵') || text.includes('베이커리')) return '제과/베이커리';
-                if (text.includes('분식') || text.includes('김밥') || text.includes('떡볶이')) return '분식';
-                if (text.includes('치킨')) return '치킨';
-                if (text.includes('호프') || text.includes('주점') || text.includes('포차')) return '주점/술집';
-                return '기타 음식점';
-            }
-
-            function sortGroupEntries(groups) {
-                return Object.entries(groups).sort(([aName, aList], [bName, bList]) => {
-                    const ai = CATEGORY_ORDER.indexOf(aName);
-                    const bi = CATEGORY_ORDER.indexOf(bName);
-                    if (ai !== -1 && bi !== -1) return ai - bi;      // 둘 다 고정 순서에 있으면 그 순서대로
-                    if (ai !== -1) return -1;                          // 고정 순서에 있는 쪽을 앞으로
-                    if (bi !== -1) return 1;
-                    return bList.length - aList.length;               // 둘 다 모르는 카테고리면 개수 많은 순
-                });
-            }
-
             function createCustomPopup(store, position) {
                 if (activePopupOverlay) {
                     activePopupOverlay.setMap(null);
@@ -1018,19 +1331,19 @@
                 const popupHtml = `
                     <div class="custom-popup-bubble">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                            <a href="${mapUrl}" target="_blank" style="font-weight:bold; font-size:14px; color:#2563eb; text-decoration:none; max-width: 140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${name}</a>
-                            <span style="background:#fffbeb; color:#d97706; font-size:10px; padding:2px 5px; border-radius:4px; font-weight:bold; border:1px solid #fef3c7;">⭐ ${rating}</span>
+                            <a href="${mapUrl}" target="_blank" style="font-weight:bold; font-size:17px; color:#2563eb; text-decoration:none; max-width: 140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${name}</a>
+                            <span style="background:#fffbeb; color:#d97706; font-size:12px; padding:2px 5px; border-radius:4px; font-weight:bold; border:1px solid #fef3c7;">⭐ ${rating}</span>
                         </div>
-                        <div style="font-size:11px; color:#64748b; margin-bottom:2px;">[${category}]</div>
-                        <div style="font-size:11px; color:#475569; margin-bottom:2px; line-height:1.2;">📍 ${address}</div>
-                        <div style="font-size:11px; color:#64748b; margin-bottom:6px;">☎️ ${tel}</div>
+                        <div style="font-size:13px; color:#64748b; margin-bottom:2px;">[${category}]</div>
+                        <div style="font-size:13px; color:#475569; margin-bottom:2px; line-height:1.2;">📍 ${address}</div>
+                        <div style="font-size:13px; color:#64748b; margin-bottom:6px;">☎️ ${tel}</div>
                         <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #f1f5f9; padding-top:6px;">
-                            <span style="font-size:10px; color:#94a3b8;">약 ${store.distanceMeters}m 거리</span>
+                            <span style="font-size:12px; color:#94a3b8;">약 ${store.distanceMeters}m 거리</span>
                             <div style="display:flex; gap:4px;">
-                                <button onclick="window.toggleWishFromWindow('${getStoreKey(store)}')" style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:4px; padding:2px 6px; cursor:pointer; font-size:11px; font-weight:bold; color:#334155;">
+                                <button onclick="window.toggleWishFromWindow('${getStoreKey(store)}')" style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:4px; padding:2px 6px; cursor:pointer; font-size:13px; font-weight:bold; color:#334155;">
                                     ${isW ? '❤️' : '🤍'} 찜
                                 </button>
-                                <button id="popup-close-btn" style="background:#e2e8f0; border:none; border-radius:4px; padding:2px 6px; cursor:pointer; font-size:11px; font-weight:bold; color:#475569;">닫기</button>
+                                <button id="popup-close-btn" style="background:#e2e8f0; border:none; border-radius:4px; padding:2px 6px; cursor:pointer; font-size:13px; font-weight:bold; color:#475569;">닫기</button>
                             </div>
                         </div>
                     </div>
@@ -1275,7 +1588,7 @@
                     listContainer.innerHTML = `
                         <div style="text-align:center; padding:40px 0; color:#64748b;">
                             <div class="spinner" style="width:32px; height:32px; border:3px solid #e2e8f0; border-top-color:#2563eb; border-radius:50%; margin:0 auto 12px; animation:spin 0.7s linear infinite;"></div>
-                            <div style="font-size:13px;">불러오는 중...</div>
+                            <div style="font-size:15px;">불러오는 중...</div>
                         </div>
                         <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
                     `;
@@ -1314,7 +1627,13 @@
                     return found;
                 };
                 currentStores = rawItems.filter(s => getFoodCategory(s.indsSclsNm, s.indsLclsNm, s.bizesNm, s.indsMclsNm) !== null);
-                renderStores(currentStores);
+                console.log(`[진단] 원본 ${rawItems.length}건 중 음식점으로 분류된 건수: ${currentStores.length}건`);
+                if (rawItems.length > 0 && currentStores.length === 0) {
+                    console.warn('⚠️ 원본 데이터는 있는데 음식점으로 분류된 게 0건입니다. 첫 번째 원본 항목 필드를 확인하세요:', rawItems[0]);
+                }
+                filterStores();
+                // 분석 화면이 이제 기본(메인) 화면이라, 데이터가 갱신될 때마다(미리보기 -> 1페이지 -> 백그라운드) 항상 같이 새로고침한다.
+                renderTradeAreaAnalysis();
             }
 
             // 화면이 오래 하얗게 비어있지 않도록, 먼저 아주 작은 "미리보기"(30건)를 빠르게 받아서
@@ -1334,6 +1653,15 @@
 
                 showLoadingSpinner();
                 showGuideMessage('🔄 불러오는 중...');
+
+                // 위도/경도는 참고 정보일 뿐이고, 실제 주소를 역지오코딩해서 분석 화면 상단에 표시한다.
+                currentAddressStr = '주소 확인 중...';
+                renderTradeAreaAnalysis();
+                geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+                    if (myToken !== storesLoadToken) return; // 그 사이 다른 위치로 이동했으면 무시
+                    currentAddressStr = (status === 'OK' && results[0]) ? results[0].formatted_address : '주소를 확인할 수 없습니다';
+                    renderTradeAreaAnalysis();
+                });
 
                 try {
                     // 0단계: 미리보기 (작은 건수라 빠르게 옴). 실패해도 조용히 넘어가고 본 조회로 진행한다.
@@ -1371,6 +1699,7 @@
                     const totalCount = firstPage.body.totalCount || allItems.length;
                     const usedFilter = firstPage.body.usedFilter;
                     let hasMore = firstPage.body.hasMore;
+                    window.__lastFetchTruncated = false;
 
                     console.log(`[진단] 1페이지 도착: ${allItems.length}건 (전체 ${totalCount}건, 서버 업종필터: ${usedFilter ? '적용됨' : '미적용'})`);
 
@@ -1406,6 +1735,7 @@
                     }
 
                     if (allItems.length >= MAX_TOTAL_FETCH && totalCount > allItems.length) {
+                        window.__lastFetchTruncated = true;
                         showGuideMessage(`⚠️ 업소가 너무 많아 ${MAX_TOTAL_FETCH}건까지만 표시했습니다 (전체 ${totalCount}건). 반경을 줄이면 더 정확합니다.`);
                     }
                 } catch (error) {
@@ -1424,16 +1754,27 @@
                 return r >= 1000 ? (r / 1000) + 'km' : r + 'm';
             }
 
+            function isFranchiseStore(s) {
+                return (s.brchNm || '').trim() !== '';
+            }
+
             function filterStores() {
                 if (isWishlistMode) return;
                 const kw = (document.getElementById('search-keyword')?.value || '').replace(/\s+/g, '').toLowerCase();
-                if (!kw) { renderStores(currentStores); return; }
-                renderStores(currentStores.filter(s => (s.bizesNm || '').replace(/\s+/g, '').toLowerCase().includes(kw) || (s.indsSclsNm || '').replace(/\s+/g, '').toLowerCase().includes(kw)));
+                const franchiseOnly = document.getElementById('franchise-only-check')?.checked;
+
+                let filtered = currentStores;
+                if (franchiseOnly) filtered = filtered.filter(isFranchiseStore);
+                if (kw) {
+                    filtered = filtered.filter(s => (s.bizesNm || '').replace(/\s+/g, '').toLowerCase().includes(kw) || (s.indsSclsNm || '').replace(/\s+/g, '').toLowerCase().includes(kw));
+                }
+                renderStores(filtered);
             }
 
             document.getElementById('search-btn').onclick = filterStores;
             document.getElementById('search-keyword').onkeyup = (e) => (e.key === 'Enter') && filterStores();
-            document.getElementById('map-platform-select').onchange = () => isWishlistMode ? renderWishlist() : renderStores(currentStores);
+            document.getElementById('franchise-only-check').onchange = filterStores;
+            document.getElementById('map-platform-select').onchange = () => isWishlistMode ? renderWishlist() : filterStores();
 
             function updateCenterMarker(latLngObj) {
                 if (centerMarker) centerMarker.setMap(null);
@@ -1502,7 +1843,7 @@
                     sidebar.style.transition = 'transform 0.3s cubic-bezier(0.25, 1, 0.5, 1)';
                     sidebar.style.transform = `translateY(${visibleVhToTranslateY(peekLevelsVh[0])})`;
                     currentHeightIndex = 0;
-                    sizeToggleArrowBtn.textContent = '▲';
+                    if (sizeToggleArrowBtn) sizeToggleArrowBtn.textContent = '▲';
                 }
                 if (activePopupOverlay) { activePopupOverlay.setMap(null); activePopupOverlay = null; }
                 document.querySelectorAll('.store-card').forEach(c => c.classList.remove('selected'));
@@ -1515,9 +1856,7 @@
                 updateCenterMarker(posObj);
                 loadStores(currentLat, currentLng);
 
-                if (currentActiveTab === 'analysis') {
-                    triggerAnalysisFetch();
-                }
+
             });
 
             if (navigator.geolocation) {
