@@ -1,0 +1,34 @@
+# Cloud Build가 이 파일을 찾아서 실행한다: 이미지 빌드 -> 푸시 -> Cloud Run 배포.
+# ⚠️ 여기엔 SERVICE_KEY 같은 비밀값을 절대 넣지 않는다. 이 파일은 GitHub에 그대로 커밋되므로
+# 여기 적힌 값은 전부 공개된다. SERVICE_KEY는 Cloud Run 서비스 자체의 "변수 및 보안 비밀"
+# 설정 화면에서 등록해야 한다 (배포 파이프라인과 분리해서 관리).
+
+steps:
+  # 1) Docker 이미지 빌드
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/franchise-map-git', '.']
+
+  # 2) Container Registry에 푸시
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/franchise-map-git']
+
+  # 3) Cloud Run에 배포 (서비스 이름/리전은 기존 서비스와 동일하게 맞춤)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'franchise-map-git'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/franchise-map-git'
+      - '--region'
+      - 'asia-northeast3'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+
+images:
+  - 'gcr.io/$PROJECT_ID/franchise-map-git'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
