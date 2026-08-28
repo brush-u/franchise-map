@@ -589,6 +589,19 @@
 
             const metrics = computeTradeAreaMetrics(currentStores, radius, currentLat, currentLng);
 
+            // 데이터가 아직 백그라운드로 계속 들어오는 중이면, 지금 보이는 숫자가 최종이 아니라는 걸
+            // 분석 화면에도 분명히 표시한다. (예전엔 이 표시가 없어서 "맛집목록이랑 숫자가 왜 다르지?"
+            // 하는 혼란이 있었다 — 사실 같은 데이터인데 서로 다른 로딩 시점을 본 것뿐이었다)
+            const lp = window.__loadProgress;
+            let loadingBanner = '';
+            if (lp && lp.loading) {
+                loadingBanner = `
+                    <div style="background:#fff7ed; border:1px solid #fed7aa; color:#9a3412; border-radius:8px; padding:10px 14px; font-size:13px;">
+                        🔄 데이터를 계속 불러오는 중입니다 (${lp.loaded}${lp.total ? '/' + Math.min(lp.total, 3000) : ''}건). 아래 수치는 완료되면 조금 더 늘어날 수 있습니다.
+                    </div>
+                `;
+            }
+
             // 일반인 대상 요약 문장 — 숫자만 나열하지 않고 말로 풀어서 한눈에 감이 오게 한다.
             const topCat = metrics.categoryBreakdown[0];
             const densityFeel = metrics.densityPerKm2 > 800 ? '매우 밀집된' : metrics.densityPerKm2 > 300 ? '적당히 밀집된' : '한산한';
@@ -596,6 +609,7 @@
             const summarySentence = `이 지역은 <strong>${densityFeel} 상권</strong>이고, <strong>${topCat ? topCat.name : '음식점'}</strong>이 가장 많으며(${topCat ? topCat.pct.toFixed(0) : 0}%), 전체적으로 <strong>${diversityFeel}</strong> 편입니다. 프랜차이즈 비중은 <strong>${metrics.franchisePct.toFixed(0)}%</strong>입니다.`;
 
             let html = `
+                ${loadingBanner}
                 <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:14px; font-size:14px; color:#166534; line-height:1.6;">
                     💬 ${summarySentence}
                 </div>
@@ -1658,6 +1672,10 @@
 
                 showLoadingSpinner();
                 showGuideMessage('🔄 불러오는 중...');
+                // 분석 화면과 맛집 목록 화면이 서로 다른 시점에 스크린샷/확인되면 숫자가 달라 보여서
+                // "왜 다르지?" 혼란이 생긴다. 두 화면이 같은 로딩 진행상황을 볼 수 있도록 전역 상태로 공유한다.
+                window.__loadProgress = { loading: true, loaded: 0, total: null };
+                renderTradeAreaAnalysis();
 
                 // 위도/경도는 참고 정보일 뿐이고, 실제 주소를 역지오코딩해서 분석 화면 상단에 표시한다.
                 currentAddressStr = '주소 확인 중...';
@@ -1696,6 +1714,7 @@
                         showGuideMessage(`⚠️ 데이터를 불러오지 못했습니다: ${err.detail || err.message}`);
                         currentStores = [];
                         renderStores(currentStores);
+                        window.__loadProgress = { loading: false, loaded: 0, total: 0 };
                         return;
                     }
                     if (myToken !== storesLoadToken) return;
@@ -1705,6 +1724,7 @@
                     const usedFilter = firstPage.body.usedFilter;
                     let hasMore = firstPage.body.hasMore;
                     window.__lastFetchTruncated = false;
+                    window.__loadProgress = { loading: hasMore, loaded: allItems.length, total: totalCount };
 
                     console.log(`[진단] 1페이지 도착: ${allItems.length}건 (전체 ${totalCount}건, 서버 업종필터: ${usedFilter ? '적용됨' : '미적용'})`);
 
@@ -1733,18 +1753,22 @@
 
                         allItems = allItems.concat(nextPage.body.items || []);
                         hasMore = nextPage.body.hasMore;
+                        window.__loadProgress = { loading: hasMore && allItems.length < MAX_TOTAL_FETCH, loaded: allItems.length, total: totalCount };
                         mergeAndRenderStores(allItems);
                         showGuideMessage(hasMore && allItems.length < MAX_TOTAL_FETCH
                             ? `🔄 더 불러오는 중... (${allItems.length}/${Math.min(totalCount, MAX_TOTAL_FETCH)}건)`
                             : `📍 현재 위치 기준 반경 <strong>${rangeStrFromRadius(radius)}</strong> 내 음식점 ${allItems.length}건`);
                     }
 
+                    window.__loadProgress = { loading: false, loaded: allItems.length, total: totalCount };
                     if (allItems.length >= MAX_TOTAL_FETCH && totalCount > allItems.length) {
                         window.__lastFetchTruncated = true;
                         showGuideMessage(`⚠️ 업소가 너무 많아 ${MAX_TOTAL_FETCH}건까지만 표시했습니다 (전체 ${totalCount}건). 반경을 줄이면 더 정확합니다.`);
                     }
+                    renderTradeAreaAnalysis(); // 로딩 완료 상태를 분석 화면에도 최종 반영
                 } catch (error) {
                     console.error('데이터 로드 실패:', error);
+                    window.__loadProgress = { loading: false, loaded: 0, total: 0 };
                 } finally {
                     if (myToken === storesLoadToken) storesLoadInProgress = false;
                     if (pendingStoresLoad) {
