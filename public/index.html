@@ -10,6 +10,7 @@
     <script async src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDfrimvyT5Z_mB64ljqmURgJgqbqhi7t88&libraries=places&loading=async&callback=initApp"></script>
     <!-- 그래프 렌더링용 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
     <!-- 마커가 많을 때 성능을 위한 클러스터링 라이브러리 (파일이 작아 동기 로드해도 부담이 적음.
          구글맵 콜백보다 먼저 실행되도록 보장하기 위해 async/defer를 안 쓴다) -->
     <script src="https://unpkg.com/@googlemaps/markerclusterer@2.5.3/dist/index.min.js"></script>
@@ -563,19 +564,30 @@
 
             // 프랜차이즈 TOP 브랜드 (브랜드명 = 지점명을 뗀 상호명, 예: "교촌치킨 강남점" -> "교촌치킨")
             const brandCounts = {};
+            const brandCategory = {};
             franchiseStores.forEach(s => {
                 let brand = (s.bizesNm || '').trim();
                 const branch = (s.brchNm || '').trim();
                 if (branch && brand.endsWith(branch)) brand = brand.slice(0, -branch.length).trim();
                 if (!brand) return;
                 brandCounts[brand] = (brandCounts[brand] || 0) + 1;
+                if (!brandCategory[brand]) {
+                    brandCategory[brand] = getFoodCategory(s.indsSclsNm, s.indsLclsNm, s.bizesNm, s.indsMclsNm) || '기타';
+                }
             });
             const topBrands = Object.entries(brandCounts)
-                .map(([name, count]) => ({ name, count }))
+                .map(([name, count]) => ({
+                    name,
+                    count,
+                    category: brandCategory[name],
+                    pctOfFranchise: franchiseCount > 0 ? (count / franchiseCount * 100) : 0,
+                }))
                 .sort((a, b) => b.count - a.count)
                 .slice(0, 5);
+            const topBrandsCombinedCount = topBrands.reduce((sum, b) => sum + b.count, 0);
+            const topBrandsConcentrationPct = franchiseCount > 0 ? (topBrandsCombinedCount / franchiseCount * 100) : 0;
 
-            return { total, densityPerKm2, areaKm2, categoryBreakdown, franchiseCount, franchisePct, diversityScore, points, uniqueAddressCount, avgStoresPerBuilding, multiTenantBuildings, walkBuckets, dongBreakdown, topBrands };
+            return { total, densityPerKm2, areaKm2, categoryBreakdown, franchiseCount, franchisePct, diversityScore, points, uniqueAddressCount, avgStoresPerBuilding, multiTenantBuildings, walkBuckets, dongBreakdown, topBrands, topBrandsConcentrationPct };
         }
 
         let categoryChartInstance = null;
@@ -617,7 +629,11 @@
 
             // 일반인 대상 요약 문장 — 숫자만 나열하지 않고 말로 풀어서 한눈에 감이 오게 한다.
             const topCat = metrics.categoryBreakdown[0];
-            const densityFeel = metrics.densityPerKm2 > 800 ? '매우 밀집된' : metrics.densityPerKm2 > 300 ? '적당히 밀집된' : '한산한';
+            // ⚠️ ㎢당 밀도만 보면 반경이 클 때(2km 등) 면적이 넓어서 실제로는 음식점이 많아도
+            // 밀도가 희석되어 "한산한 상권"으로 잘못 분류되는 문제가 있었다. 절대 개수도 함께 본다.
+            const densityFeel = (metrics.densityPerKm2 > 500 || metrics.total > 600) ? '매우 밀집된'
+                : (metrics.densityPerKm2 > 150 || metrics.total > 200) ? '적당히 밀집된'
+                : '한산한';
             const diversityFeel = metrics.diversityScore >= 70 ? '메뉴 선택지가 다양한' : metrics.diversityScore >= 40 ? '어느 정도 다양한' : '특정 업종에 쏠린';
             const summarySentence = `이 지역은 <strong>${densityFeel} 상권</strong>이고, <strong>${topCat ? topCat.name : '음식점'}</strong>이 가장 많으며(${topCat ? topCat.pct.toFixed(0) : 0}%), 전체적으로 <strong>${diversityFeel}</strong> 편입니다. 프랜차이즈 비중은 <strong>${metrics.franchisePct.toFixed(0)}%</strong>입니다.`;
 
@@ -708,11 +724,17 @@
             if (metrics.topBrands.length > 0) {
                 html += `
                     <div style="background:white; padding:16px; border-radius:10px; border:1px solid #e2e8f0;">
-                        <div style="font-size:18px; font-weight:bold; color:#1e293b; margin-bottom:10px;">🏪 프랜차이즈 TOP ${metrics.topBrands.length}</div>
+                        <div style="font-size:18px; font-weight:bold; color:#1e293b; margin-bottom:6px;">🏪 프랜차이즈 TOP ${metrics.topBrands.length}</div>
+                        <div style="font-size:13px; color:#64748b; margin-bottom:10px;">
+                            상위 ${metrics.topBrands.length}개 브랜드가 이 지역 프랜차이즈(${metrics.franchiseCount}개) 중 <strong style="color:#2563eb;">${metrics.topBrandsConcentrationPct.toFixed(0)}%</strong>를 차지합니다${metrics.topBrandsConcentrationPct >= 50 ? ' — 소수 브랜드에 쏠려있는 편이에요.' : ' — 비교적 브랜드가 골고루 퍼져있는 편이에요.'}
+                        </div>
                         ${metrics.topBrands.map((b, i) => `
-                            <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; ${i > 0 ? 'border-top:1px solid #f1f5f9;' : ''}">
-                                <span style="font-size:16px; color:#334155;">${i + 1}. ${b.name}</span>
-                                <span style="font-size:15px; color:#64748b; font-weight:bold;">${b.count}개</span>
+                            <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; ${i > 0 ? 'border-top:1px solid #f1f5f9;' : ''}">
+                                <span style="font-size:16px; color:#334155;">${i + 1}. ${b.name} <span style="font-size:12px; color:#94a3b8; font-weight:normal;">(${b.category})</span></span>
+                                <span style="text-align:right;">
+                                    <span style="font-size:15px; color:#334155; font-weight:bold;">${b.count}개</span>
+                                    <span style="font-size:12px; color:#94a3b8;"> · 프랜차이즈 중 ${b.pctOfFranchise.toFixed(0)}%</span>
+                                </span>
                             </div>
                         `).join('')}
                         <div style="font-size:13px; color:#94a3b8; margin-top:8px;">※ 지점명(브랜드+지점) 등록 여부 기준 근사치입니다.</div>
@@ -734,10 +756,13 @@
             // ── 차트 렌더링 (Chart.js) ──
             if (typeof Chart !== 'undefined') {
                 const palette = ['#2563eb', '#f59e0b', '#10b981', '#8b5cf6', '#ef4444', '#06b6d4', '#ec4899', '#84cc16', '#f97316', '#6366f1', '#14b8a6'];
+                // 업종명/개수/%를 호버 없이 막대 위에 바로 보여주기 위한 플러그인 등록
+                if (window.ChartDataLabels) Chart.register(window.ChartDataLabels);
 
                 if (categoryChartInstance) categoryChartInstance.destroy();
                 const barCtx = document.getElementById('category-bar-chart');
                 if (barCtx) {
+                    const maxCount = Math.max(...metrics.categoryBreakdown.map(c => c.count), 1);
                     categoryChartInstance = new Chart(barCtx, {
                         type: 'bar',
                         data: {
@@ -752,11 +777,19 @@
                             indexAxis: 'y',
                             responsive: true,
                             maintainAspectRatio: false,
+                            layout: { padding: { right: 60 } }, // 막대 끝 라벨이 안 잘리도록 여백 확보
                             plugins: {
                                 legend: { display: false },
                                 tooltip: { callbacks: { label: (ctx) => `${ctx.raw}개 (${metrics.categoryBreakdown[ctx.dataIndex].pct.toFixed(1)}%)` } },
+                                datalabels: {
+                                    anchor: 'end',
+                                    align: 'right',
+                                    color: '#334155',
+                                    font: { size: 11, weight: 'bold' },
+                                    formatter: (value, ctx) => `${value}개 (${metrics.categoryBreakdown[ctx.dataIndex].pct.toFixed(0)}%)`,
+                                },
                             },
-                            scales: { x: { beginAtZero: true, ticks: { precision: 0 } } },
+                            scales: { x: { beginAtZero: true, max: maxCount * 1.25, ticks: { precision: 0 } } },
                         },
                     });
                 }
@@ -779,6 +812,14 @@
                             plugins: {
                                 legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } },
                                 tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${ctx.raw}개 (${metrics.categoryBreakdown[ctx.dataIndex].pct.toFixed(1)}%)` } },
+                                datalabels: {
+                                    color: '#fff',
+                                    font: { size: 10, weight: 'bold' },
+                                    formatter: (value, ctx) => {
+                                        const pct = metrics.categoryBreakdown[ctx.dataIndex].pct;
+                                        return pct >= 5 ? `${pct.toFixed(0)}%` : ''; // 너무 작은 조각엔 라벨 생략(글자 겹침 방지)
+                                    },
+                                },
                             },
                         },
                     });
@@ -1301,11 +1342,10 @@
             }
 
             function clearMarkers() {
-                if (mapClusterer) {
-                    mapClusterer.clearMarkers();
-                } else {
-                    currentMarkers.forEach(item => item.marker.setMap(null));
-                }
+                // 마커 수에 따라 클러스터러를 쓰기도, 안 쓰기도 하므로 두 경로 모두 확실히 지운다.
+                // (하나만 지우면 다른 경로로 추가된 마커가 안 지워지고 계속 쌓이는 버그가 생긴다)
+                currentMarkers.forEach(item => item.marker.setMap(null));
+                if (mapClusterer) mapClusterer.clearMarkers();
                 currentMarkers = [];
                 if (activePopupOverlay) {
                     activePopupOverlay.setMap(null);
@@ -1419,6 +1459,7 @@
 
                 const groups = {};
                 const newMarkers = [];
+                const useClusterer = mapClusterer && storesToRender.length > 30; // 적은 수는 클러스터링 계산 자체를 건너뛴다
                 storesToRender.forEach((store) => {
                     const groupKey = getFoodCategory(store.indsSclsNm, store.indsLclsNm, store.bizesNm, store.indsMclsNm);
                     if (!groupKey) return; 
@@ -1437,13 +1478,13 @@
                     if (!isNaN(storeLat) && !isNaN(storeLon)) {
                         const markerPos = { lat: storeLat, lng: storeLon };
                         // 클러스터러를 쓸 땐 map을 바로 지정하지 않고 클러스터러가 관리하게 한다.
-                        const marker = new google.maps.Marker({ position: markerPos, map: mapClusterer ? null : map });
+                        const marker = new google.maps.Marker({ position: markerPos, map: useClusterer ? null : map });
                         marker.addListener('click', () => createCustomPopup(store, markerPos));
                         currentMarkers.push({ marker, store });
                         newMarkers.push(marker);
                     }
                 });
-                if (mapClusterer && newMarkers.length > 0) {
+                if (useClusterer && newMarkers.length > 0) {
                     mapClusterer.addMarkers(newMarkers);
                 }
 
@@ -1815,12 +1856,39 @@
             document.getElementById('franchise-only-check').onchange = filterStores;
             document.getElementById('map-platform-select').onchange = filterStores;
 
+            // 클릭/이동한 그 순간(데이터가 오기 한참 전)에 바로 물결 애니메이션을 보여줘서
+            // "반응이 즉각적이다"는 느낌을 준다. 실제 로딩 시간은 그대로지만 체감 속도가 크게 개선된다.
+            function pulseAtLocation(latLngObj) {
+                const maxPulseRadius = Math.max(radius * 0.5, 150);
+                const steps = 16;
+                let step = 0;
+                const pulseCircle = new google.maps.Circle({
+                    strokeWeight: 0,
+                    fillColor: '#2563eb',
+                    fillOpacity: 0.35,
+                    map: map,
+                    center: latLngObj,
+                    radius: 10,
+                    clickable: false,
+                });
+                const timer = setInterval(() => {
+                    step++;
+                    pulseCircle.setRadius((maxPulseRadius / steps) * step);
+                    pulseCircle.setOptions({ fillOpacity: 0.35 * (1 - step / steps) });
+                    if (step >= steps) {
+                        clearInterval(timer);
+                        pulseCircle.setMap(null);
+                    }
+                }, 20);
+            }
+
             function updateCenterMarker(latLngObj) {
                 if (centerMarker) centerMarker.setMap(null);
                 if (centerCircle) centerCircle.setMap(null);
 
                 centerMarker = new google.maps.Marker({ position: latLngObj, map: map, icon: { url: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png' } });
                 centerCircle = new google.maps.Circle({ strokeColor: '#2563eb', strokeOpacity: 0.8, strokeWeight: 2, fillColor: '#2563eb', fillOpacity: 0.1, map: map, center: latLngObj, radius: radius });
+                pulseAtLocation(latLngObj);
 
                 updateGuideText(radius, null);
                 geocoder.geocode({ location: latLngObj }, (results, status) => {
