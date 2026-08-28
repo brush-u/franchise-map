@@ -401,7 +401,14 @@
         // (예전엔 initApp() 안에서만 선언되어 있어서 분석 탭이 이 값들을 아예 못 읽고 조용히 실패했다)
         let currentStores = [];
         let radius = 400;
-        const MAX_TOTAL_FETCH = 3000; // 체감 속도를 위한 상한 (그 이상은 반경을 줄이도록 안내) — 분석 화면도 이 값을 참조해야 해서 전역으로 뺐다.
+        // 서버가 업종 필터를 지원하지 않는 것으로 확인되어(Q, 12 둘 다 NODATA_ERROR), 이제 "원본을 몇 건
+        // 받았나"가 아니라 "실제 음식점을 몇 건 확보했나"를 기준으로 언제까지 더 받을지 결정한다.
+        const MAX_FOOD_TARGET = 1000;   // 목표: 음식점이 이만큼 모이면 그만 받는다
+        const MAX_RAW_FETCH = 8000;     // 안전장치: 음식점 밀도가 너무 낮은 지역에서 무한정 받지 않도록 원본 총량 상한
+
+        function countFoodItems(items) {
+            return items.filter(s => getFoodCategory(s.indsSclsNm, s.indsLclsNm, s.bizesNm, s.indsMclsNm) !== null).length;
+        }
 
         // 이 프로그램의 주 용도는 상권 분석이라, 분석 화면을 기본으로 항상 보여주고
         // 맛집 목록은 필요할 때만 "🔍 맛집 목록" 버튼으로 슬라이드로 열어본다.
@@ -718,7 +725,8 @@
 
             if (window.__lastFetchTruncated) {
                 const totalRaw = (window.__loadProgress && window.__loadProgress.total) || '?';
-                html += `<div style="font-size:14px; color:#94a3b8; text-align:center;">⚠️ 반경 내 전체 ${totalRaw}건 중 ${MAX_TOTAL_FETCH}건까지만 조회해서 그중 음식점 ${metrics.total}건을 분석했습니다. 반경을 줄이면 더 정확합니다.</div>`;
+                const rawFetched = (window.__loadProgress && window.__loadProgress.loaded) || '?';
+                html += `<div style="font-size:14px; color:#94a3b8; text-align:center;">⚠️ 반경 내 음식점 전체 ${totalRaw}건 중 ${rawFetched}건까지만 조회했습니다. 반경을 줄이면 더 정확합니다.</div>`;
             }
 
             dashboardContainer.innerHTML = html;
@@ -1551,8 +1559,8 @@
                 }
             }
 
-            async function fetchStorePage(lat, lng, pageNo, useFilterParam, numOfRows) {
-                const qs = new URLSearchParams({ cx: lng, cy: lat, radius, pageNo, useFilter: useFilterParam });
+            async function fetchStorePage(lat, lng, pageNo, numOfRows) {
+                const qs = new URLSearchParams({ cx: lng, cy: lat, radius, pageNo });
                 if (numOfRows) qs.set('numOfRows', numOfRows);
                 const response = await fetch(`/api/stores/radius?${qs.toString()}`);
                 const data = await response.json();
@@ -1624,14 +1632,12 @@
 
                 try {
                     // 0단계: 미리보기 (작은 건수라 빠르게 옴). 실패해도 조용히 넘어가고 본 조회로 진행한다.
-                    let usedFilterHint = 'auto';
                     try {
-                        const preview = await fetchStorePage(lat, lng, 1, 'auto', PREVIEW_SIZE);
+                        const preview = await fetchStorePage(lat, lng, 1, PREVIEW_SIZE);
                         if (myToken !== storesLoadToken) return;
                         const previewItems = preview.body.items || [];
-                        usedFilterHint = preview.body.usedFilter ? '1' : '0';
                         if (previewItems.length > 0) {
-                            console.log(`[진단] 미리보기 도착: ${previewItems.length}건 (즉시 표시)`);
+                            console.log(`[진단] 미리보기 도착: ${previewItems.length}건 (즉시 표시, 업종필터: 적용(${preview.body.usedFilterValue}))`);
                             mergeAndRenderStores(previewItems);
                             showGuideMessage('🔄 나머지 불러오는 중...');
                         }
@@ -1640,11 +1646,10 @@
                     }
                     if (myToken !== storesLoadToken) return;
 
-                    // 1단계: 정식 1페이지 (미리보기에서 필터 적용 여부를 확인했으면 그대로 재사용해서
-                    // 서버가 다시 판단하지 않아도 되게 한다 = 한 템포 더 빠름)
+                    // 1단계: 정식 1페이지
                     let firstPage;
                     try {
-                        firstPage = await fetchStorePage(lat, lng, 1, usedFilterHint);
+                        firstPage = await fetchStorePage(lat, lng, 1);
                     } catch (err) {
                         console.error('❌ [상점 조회 실패]', err.detail || err.message);
                         showGuideMessage(`⚠️ 데이터를 불러오지 못했습니다: ${err.detail || err.message}`);
@@ -1657,17 +1662,22 @@
 
                     let allItems = firstPage.body.items || [];
                     const totalCount = firstPage.body.totalCount || allItems.length;
-                    const usedFilter = firstPage.body.usedFilter;
+                    window.__lastUsedFilter = firstPage.body.usedFilter; // ✅ 이제 항상 true (I2 무조건 적용)
                     let hasMore = firstPage.body.hasMore;
                     window.__lastFetchTruncated = false;
                     window.__loadProgress = { loading: hasMore, loaded: allItems.length, total: totalCount };
 
-                    console.log(`[진단] 1페이지 도착: ${allItems.length}건 (전체 ${totalCount}건, 서버 업종필터: ${usedFilter ? '적용됨' : '미적용'})`);
+                    let foodCount = countFoodItems(allItems);
+                    console.log(`[진단] 1페이지 도착: 원본 ${allItems.length}건 (서버가 이미 음식점만 필터링해서 전체 ${totalCount}건) 중 실제 음식점으로 분류된 것 ${foodCount}건`);
 
                     mergeAndRenderStores(allItems);
 
-                    if (hasMore && totalCount > allItems.length) {
-                        showGuideMessage(`🔄 더 불러오는 중... (${allItems.length}/${Math.min(totalCount, MAX_TOTAL_FETCH)}건)`);
+                    // 서버가 이제 indsLclsCd=I2로 음식점만 걸러서 주기 때문에, 원본 개수 자체가 이미
+                    // 음식점 개수와 거의 같다. 그래도 안전하게 "실제 음식점 확보량" 기준을 그대로 유지한다.
+                    const needMore = () => hasMore && foodCount < MAX_FOOD_TARGET && allItems.length < MAX_RAW_FETCH;
+
+                    if (needMore()) {
+                        showGuideMessage(`🔄 음식점을 더 찾는 중... (지금까지 음식점 ${foodCount}건, 원본 ${allItems.length}건 확인)`);
                     } else {
                         // 1페이지만으로 이미 끝난 경우 — 여기서 바로 최종 안내를 띄우지 않으면
                         // "불러오는 중..." 문구에서 영영 안 바뀌는 문제가 있었다.
@@ -1677,19 +1687,18 @@
                     // 나머지 페이지는 뒤에서 계속 이어받는다. 그 사이 사용자가 다른 곳을 클릭/줌하면
                     // storesLoadToken이 바뀌어서 이 루프는 스스로 멈춘다 (낡은 응답이 화면을 덮어쓰지 않게).
                     let pageNo = 1;
-                    const filterFlag = usedFilter ? '1' : '0';
                     // 페이지가 들어올 때마다 매번 차트/마커를 통째로 다시 그리면 모바일에서 버벅인다.
                     // 최종 결과는 항상 정확하게 반영하되, 중간 갱신은 일정 간격을 두고 묶어서 처리한다.
                     let lastFullRenderTime = Date.now();
                     const RENDER_THROTTLE_MS = window.innerWidth <= 768 ? 1200 : 500;
 
-                    while (hasMore && allItems.length < MAX_TOTAL_FETCH) {
+                    while (needMore()) {
                         if (myToken !== storesLoadToken) return; // 더 최신 요청이 시작됐으면 중단
                         await new Promise((r) => setTimeout(r, BG_PAGE_DELAY_MS));
                         pageNo++;
                         let nextPage;
                         try {
-                            nextPage = await fetchStorePage(lat, lng, pageNo, filterFlag);
+                            nextPage = await fetchStorePage(lat, lng, pageNo);
                         } catch (err) {
                             console.warn('⚠️ 백그라운드 페이지 로딩 중단:', err.detail || err.message);
                             break;
@@ -1698,9 +1707,10 @@
 
                         allItems = allItems.concat(nextPage.body.items || []);
                         hasMore = nextPage.body.hasMore;
-                        window.__loadProgress = { loading: hasMore && allItems.length < MAX_TOTAL_FETCH, loaded: allItems.length, total: totalCount };
+                        foodCount = countFoodItems(allItems);
+                        window.__loadProgress = { loading: needMore(), loaded: allItems.length, total: totalCount };
 
-                        const isFinalPage = !hasMore || allItems.length >= MAX_TOTAL_FETCH;
+                        const isFinalPage = !needMore();
                         const now = Date.now();
                         if (isFinalPage || (now - lastFullRenderTime) >= RENDER_THROTTLE_MS) {
                             mergeAndRenderStores(allItems);
@@ -1708,25 +1718,22 @@
                         }
 
                         // "내 음식점 N건"은 원본 개수(allItems)가 아니라 실제 음식점으로 걸러진 개수(currentStores)를 써야 한다.
-                        // 서버 업종필터가 실패해서 부동산/미용실 등 비음식 업종까지 섞여 들어온 경우, allItems는
+                        // 서버 업종필터가 없어서 부동산/미용실 등 비음식 업종까지 섞여 들어오기 때문에, allItems는
                         // 훨씬 큰 원본 총합이라 "음식점 2323건"처럼 완전히 틀린 숫자로 보였다.
                         showGuideMessage(isFinalPage
                             ? `📍 현재 위치 기준 반경 <strong>${rangeStrFromRadius(radius)}</strong> 내 음식점 ${currentStores.length}건`
-                            : `🔄 더 불러오는 중... (${allItems.length}/${Math.min(totalCount, MAX_TOTAL_FETCH)}건)`);
+                            : `🔄 음식점을 더 찾는 중... (지금까지 음식점 ${foodCount}건, 원본 ${allItems.length}건 확인)`);
                     }
 
                     // 마지막 페이지가 스로틀에 걸려서 아직 반영 안 됐을 수 있으니 한 번 더 확실히 반영한다.
                     mergeAndRenderStores(allItems);
 
                     window.__loadProgress = { loading: false, loaded: allItems.length, total: totalCount };
-                    if (allItems.length >= MAX_TOTAL_FETCH && totalCount > allItems.length) {
+                    if (foodCount >= MAX_FOOD_TARGET || allItems.length >= MAX_RAW_FETCH) {
                         window.__lastFetchTruncated = true;
-                        // 예전엔 이 메시지가 "내 음식점 N건" 문구를 덮어써버려서, 실제 분석된 음식점 수를
-                        // 목록 화면에서 확인할 방법이 없었다. 그래서 분석 화면 숫자와 비교하다가
-                        // "왜 다르지?"하는 혼란이 생겼다. 두 숫자를 한 문장에 같이 명시한다.
-                        // (totalCount는 업종필터 성공 여부에 따라 "전체 음식점 수"이거나 "반경 내 전체 업소 수"일 수 있어
-                        //  currentStores.length와 자연스럽게 다를 수 있다 — 이건 버그가 아니라 서로 다른 걸 세는 것)
-                        showGuideMessage(`📍 음식점 <strong>${currentStores.length}건</strong> 분석 완료 (반경 내 전체 ${totalCount}건 중 ${MAX_TOTAL_FETCH}건까지만 조회함). 반경을 줄이면 더 정확합니다.`);
+                        // 서버가 업종 필터를 지원하지 않아서, 반경 내 "전체 업종"(음식점 아닌 것 포함) 중
+                        // 일부만 받아서 그 안에서 음식점을 골라낸 결과라는 걸 분명히 밝힌다.
+                        showGuideMessage(`📍 음식점 <strong>${currentStores.length}건</strong> 분석 완료 (반경 내 음식점 전체 ${totalCount}건 중 ${allItems.length}건까지만 조회함). 반경을 줄이면 더 정확합니다.`);
                     }
                     renderTradeAreaAnalysis(); // 로딩 완료 상태를 분석 화면에도 최종 반영
                 } catch (error) {
