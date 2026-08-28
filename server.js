@@ -37,16 +37,18 @@ const httpsAgent = new https.Agent({ rejectUnauthorized: false });
  */
 app.get('/api/stores/radius', async (req, res) => {
   try {
-    const { cx, cy, radius } = req.query;
+    const { cx, cy } = req.query;
     const pageNo = parseInt(req.query.pageNo, 10) || 1;
-    const useFilterParam = req.query.useFilter || 'auto'; // 'auto' | '1' | '0'
 
-    if (!cx || !cy || !radius) {
+    if (!cx || !cy || !req.query.radius) {
       return res.status(400).json({
         success: false,
         message: '경도(cx), 위도(cy), 반경(radius) 값이 모두 필요합니다.',
       });
     }
+
+    // 공식 명세서 확인: radius 최대 2000m. 넘겨도 API가 에러를 낼 수 있으니 여기서 안전하게 잘라준다.
+    const radius = Math.min(parseInt(req.query.radius, 10) || 500, 2000);
 
     if (!SERVICE_KEY) {
       console.error('❌ SERVICE_KEY 환경변수가 설정되지 않았습니다.');
@@ -54,15 +56,17 @@ app.get('/api/stores/radius', async (req, res) => {
     }
 
     const apiURL = 'https://apis.data.go.kr/B553077/api/open/sdsc2/storeListInRadius';
-    // numOfRows를 프론트가 지정할 수 있게 열어둔다. 작은 값(예: 30)으로 먼저 "미리보기"를
-    // 빠르게 받아서 화면에 즉시 뭔가 보여주고, 이어서 큰 페이지로 전체를 채우는 데 쓴다.
-    const PAGE_SIZE = Math.min(parseInt(req.query.numOfRows, 10) || 500, 500);
-    // 업종 대분류: '12' = 음식 (실제 응답 데이터에서 확인된 값).
-    const FOOD_INDS_LCLS_CD = '12';
+    // 공식 명세서 확인: numOfRows 최대 1000 (예전엔 500으로 알고 있었는데 명세상 1000까지 가능 —
+    // 페이지당 2배씩 더 받을 수 있어서 필요한 페이지 수가 절반으로 줄어든다).
+    const PAGE_SIZE = Math.min(parseInt(req.query.numOfRows, 10) || 1000, 1000);
+
+    // ✅ indsLclsCd=I2(음식) — 사용자가 확보한 공식 오퍼레이션 명세서로 확정 검증됨.
+    // 더 이상 추측/후보 테스트가 필요 없다. 무조건 이 값으로 필터를 걸어서 요청한다.
+    const FOOD_INDS_LCLS_CD = 'I2';
 
     const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-    async function fetchOnePage(useIndsFilter, retriesLeft = 2) {
+    async function fetchOnePage(retriesLeft = 2) {
       try {
         const params = {
           serviceKey: SERVICE_KEY,
@@ -72,8 +76,8 @@ app.get('/api/stores/radius', async (req, res) => {
           type: 'json',
           numOfRows: PAGE_SIZE,
           pageNo,
+          indsLclsCd: FOOD_INDS_LCLS_CD,
         };
-        if (useIndsFilter) params.indsLclsCd = FOOD_INDS_LCLS_CD;
         const response = await axios.get(apiURL, { httpsAgent, params });
 
         const resultCode = response.data?.header?.resultCode;
@@ -91,38 +95,35 @@ app.get('/api/stores/radius', async (req, res) => {
         if (isRateLimited && retriesLeft > 0) {
           console.warn(`⏳ 초당 요청 제한에 걸려 1.2초 대기 후 재시도합니다 (남은 재시도: ${retriesLeft})`);
           await sleep(1200);
-          return fetchOnePage(useIndsFilter, retriesLeft - 1);
+          return fetchOnePage(retriesLeft - 1);
         }
         throw err;
       }
     }
 
     let response;
-    let usedFilter;
+    let items = [];
+    let totalCount = 0;
 
-    if (useFilterParam === '1' || useFilterParam === '0') {
-      // 프론트가 이전 페이지 응답으로부터 이미 알고 있는 값 그대로 사용 (재판단 불필요, 더 빠름)
-      usedFilter = useFilterParam === '1';
-      response = await fetchOnePage(usedFilter);
-    } else {
-      // 'auto': 필터를 걸어서 시도하고, 실패하면 필터 없이 재시도
-      try {
-        response = await fetchOnePage(true);
-        usedFilter = true;
-      } catch (err) {
-        if (err.isLogicalError) {
-          console.warn('⚠️ 업종 필터(indsLclsCd) 사용 시 실패해서 필터 없이 재시도합니다:', err.message);
-          response = await fetchOnePage(false);
-          usedFilter = false;
-        } else {
-          throw err;
-        }
+    try {
+      response = await fetchOnePage();
+    } catch (err) {
+      if (err.isLogicalError && err.apiHeader?.resultCode === '03') {
+        // NODATA_ERROR = 이 좌표/반경 안에 진짜로 음식점이 0건이라는 뜻(파라미터 문제 아님, I2는 검증된 값).
+        // 에러로 취급하지 않고 정상적으로 "0건"을 반환한다.
+        console.log('ℹ️ 이 반경엔 음식점이 없습니다 (NODATA_ERROR, 정상 상황).');
+        totalCount = 0;
+        items = [];
+        response = null;
+      } else {
+        throw err;
       }
     }
 
-    const dataBody = response.data?.body;
-    let items = [];
-    let totalCount = 0;
+    const usedFilter = true;
+    const usedFilterValue = FOOD_INDS_LCLS_CD;
+
+    const dataBody = response?.data?.body;
     if (dataBody) {
       if (Array.isArray(dataBody.items)) {
         items = dataBody.items;
@@ -133,11 +134,11 @@ app.get('/api/stores/radius', async (req, res) => {
     }
 
     const hasMore = pageNo * PAGE_SIZE < totalCount;
-    console.log(`[API 성공] (필터 ${usedFilter ? '적용' : '미적용'}) 페이지 ${pageNo}: ${items.length}건 (전체 ${totalCount}건, 다음페이지: ${hasMore})`);
+    console.log(`[API 성공] (필터 ${usedFilter ? '적용(' + usedFilterValue + ')' : '미적용'}) 페이지 ${pageNo}: ${items.length}건 (전체 ${totalCount}건, 다음페이지: ${hasMore})`);
 
     return res.status(200).json({
       success: true,
-      body: { items, totalCount, pageNo, pageSize: PAGE_SIZE, hasMore, usedFilter },
+      body: { items, totalCount, pageNo, pageSize: PAGE_SIZE, hasMore, usedFilter, usedFilterValue },
     });
   } catch (error) {
     const apiResponseData = error.response?.data;
