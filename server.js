@@ -175,10 +175,16 @@ async function getSgisAccessToken() {
   if (sgisAccessToken && nowSec < sgisTokenExpiresAt - 60) {
     return sgisAccessToken; // 아직 유효함 (여유 60초 두고 재사용)
   }
+  // 복사/붙여넣기 시 앞뒤 공백이나 줄바꿈이 섞여 들어가는 경우가 흔해서 trim 처리한다.
+  const consumerKey = (SGIS_SERVICE_ID || '').trim();
+  const consumerSecret = (SGIS_SECURITY_KEY || '').trim();
+  console.log(`🔑 [진단] SGIS 인증 시도 — consumer_key 앞 4자: ${consumerKey.slice(0, 4)}... (길이: ${consumerKey.length}), consumer_secret 길이: ${consumerSecret.length}`);
+
   const response = await axios.get('https://sgisapi.mods.go.kr/OpenAPI3/auth/authentication.json', {
-    params: { consumer_key: SGIS_SERVICE_ID, consumer_secret: SGIS_SECURITY_KEY },
+    params: { consumer_key: consumerKey, consumer_secret: consumerSecret },
   });
-  if (response.data?.errCd !== 0) {
+  console.log('🔑 [진단] SGIS 인증 원본 응답:', JSON.stringify(response.data));
+  if (response.data?.errCd !== 0 || !response.data?.result?.accessToken) {
     throw new Error(`SGIS 인증 실패: ${response.data?.errMsg || '알 수 없는 오류'}`);
   }
   sgisAccessToken = response.data.result.accessToken;
@@ -194,6 +200,7 @@ async function coordsToAdmCode(lat, lng, accessToken) {
     params: { accessToken, x_coor: lng, y_coor: lat, addr_type: 20 },
   });
   if (response.data?.errCd !== 0 || !response.data.result || response.data.result.length === 0) {
+    console.error('🔍 [진단] SGIS 좌표변환 원본 응답:', JSON.stringify(response.data));
     throw new Error(`좌표→행정동 변환 실패: ${response.data?.errMsg || '결과 없음'}`);
   }
   const result = response.data.result[0];
