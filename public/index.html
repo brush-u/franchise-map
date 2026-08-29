@@ -938,6 +938,7 @@
                     ${popPerStore ? `
                     <div style="background:#eff6ff; border:1px solid #dbeafe; border-radius:8px; padding:10px 12px; margin-bottom:12px; font-size:14px; color:#1e40af;">
                         💡 이 동네는 <strong>음식점 1개당 주민 약 ${popPerStore.toLocaleString()}명</strong>꼴입니다(인구밀도÷업소밀도 기준). 그리고 <strong>${householdFeel}</strong> 지역입니다.
+                        <div style="font-size:11px; color:#3b82f6; margin-top:4px; font-weight:normal;">※ 참고용 추정치입니다. 행정동이 넓거나 상권·산림 등이 혼재된 지역은 반경 위치에 따라 이 값이 크게 달라질 수 있습니다.</div>
                     </div>` : ''}
                     <div class="analysis-metric-grid">
                         <div class="analysis-card">
@@ -1079,6 +1080,7 @@
         // 동 단위 대표 지점에 표시하는 근사치이며, 개별 매물 위치가 아니라 "이 동네에 거래가 있었다"는
         // 뜻이다.
         let realEstateDongMarkers = [];
+        let realEstateInfoWindow = null;
         function plotRealEstateDongMarkers(dongBreakdown, sidoNm, sggNm) {
             if (!dongBreakdown || dongBreakdown.length === 0) return;
             const dongKey = dongBreakdown.map(d => d.name).join(',');
@@ -1087,6 +1089,7 @@
 
             realEstateDongMarkers.forEach(m => m.setMap(null));
             realEstateDongMarkers = [];
+            if (!realEstateInfoWindow) realEstateInfoWindow = new google.maps.InfoWindow();
 
             dongBreakdown.forEach((dong) => {
                 geocoder.geocode({ address: `${sidoNm} ${sggNm} ${dong.name}` }, (results, status) => {
@@ -1105,6 +1108,17 @@
                         },
                         title: `${dong.name}: ${dong.count}건, 평균 ${(dong.avgPriceManwon/10000).toFixed(1)}억`,
                         zIndex: 999,
+                    });
+                    // 클릭하면 정보창이 뜨도록 (호버 툴팁만으론 모바일에서 아예 안 보임)
+                    marker.addListener('click', () => {
+                        realEstateInfoWindow.setContent(`
+                            <div style="padding:4px 2px; font-size:14px; line-height:1.6;">
+                                <div style="font-weight:bold; color:#1e293b; margin-bottom:4px;">🏢 ${sidoNm} ${sggNm} ${dong.name}</div>
+                                <div>거래 건수: <strong>${dong.count}건</strong></div>
+                                <div>평균 거래가: <strong>${(dong.avgPriceManwon/10000).toFixed(1)}억</strong></div>
+                            </div>
+                        `);
+                        realEstateInfoWindow.open(map, marker);
                     });
                     realEstateDongMarkers.push(marker);
                 });
