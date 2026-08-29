@@ -132,29 +132,27 @@
 
         .geolocation-btn {
             position: absolute;
-            top: 16px;
-            left: 16px;
+            bottom: 90px;
+            left: 10px;
             z-index: 9999;
             background: #ffffff;
-            border: 1px solid #cbd5e1;
-            padding: 7px 12px;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-            font-weight: bold;
-            font-size: 16px;
-            color: #334155;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+            color: #666666;
             cursor: pointer;
             display: flex;
             align-items: center;
-            gap: 4px;
+            justify-content: center;
             outline: none;
-            transition: all 0.2s;
+            transition: all 0.15s;
         }
         .geolocation-btn:hover {
-            background: #f8fafc;
-            border-color: #2563eb;
             color: #2563eb;
         }
+        .geolocation-btn svg { width: 20px; height: 20px; }
 
         .store-list { flex: 1; overflow-y: auto; padding: 15px; background: #f8fafc; -webkit-overflow-scrolling: touch; }
         
@@ -301,8 +299,8 @@
 <body>
 
     <div id="map-wrap">
-        <button id="current-location-btn" class="geolocation-btn">
-            📍 내 위치
+        <button id="current-location-btn" class="geolocation-btn" title="내 위치">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
         </button>
         <div id="map"></div>
     </div>
@@ -388,6 +386,10 @@
         // (예전엔 initApp() 안에서만 선언되어 있어서 분석 탭이 이 값들을 아예 못 읽고 조용히 실패했다)
         let currentStores = [];
         let radius = 400;
+        // map/geocoder도 같은 이유로 전역에 선언한다 — initApp() 안에서만 선언돼 있으면
+        // 지도에 마커를 찍는 전역 함수(plotRealEstateDongMarkers 등)가 접근을 못 한다.
+        let map = null;
+        let geocoder = null;
         // 서버가 업종 필터를 지원하지 않는 것으로 확인되어(Q, 12 둘 다 NODATA_ERROR), 이제 "원본을 몇 건
         // 받았나"가 아니라 "실제 음식점을 몇 건 확보했나"를 기준으로 언제까지 더 받을지 결정한다.
         const MAX_FOOD_TARGET = 1000;   // 목표: 음식점이 이만큼 모이면 그만 받는다
@@ -872,9 +874,16 @@
             return `${lat.toFixed(3)}_${lng.toFixed(3)}`;
         }
 
+        const populationLastAttempt = {}; // key -> timestamp, 에러 후 너무 빨리 재시도하지 않기 위한 최소 쿨다운용
+        const RETRY_COOLDOWN_MS = 8000;
+
         async function fetchPopulationData(lat, lng) {
             const key = getPopulationCacheKey(lat, lng);
-            if (populationCache[key]) return; // 이미 로딩했거나 로딩 중
+            const cached = populationCache[key];
+            if (cached && cached !== 'error') return; // 성공/로딩 중이면 재요청 안 함
+            if (cached === 'error' && (Date.now() - (populationLastAttempt[key] || 0)) < RETRY_COOLDOWN_MS) return; // 에러는 쿨다운 지나야 재시도
+
+            populationLastAttempt[key] = Date.now();
             populationCache[key] = 'loading';
             try {
                 const res = await fetch(`/api/population?lat=${lat}&lng=${lng}`);
@@ -893,15 +902,8 @@
             const key = getPopulationCacheKey(lat, lng);
             const cached = populationCache[key];
 
-            if (!cached) {
-                fetchPopulationData(lat, lng); // 최초 요청 트리거 (완료되면 자동으로 다시 렌더링됨)
-                return `
-                    <div style="background:white; padding:16px; border-radius:10px; border:1px solid #e2e8f0; text-align:center; color:#94a3b8; font-size:14px;">
-                        🔄 인구/가구 통계 불러오는 중...
-                    </div>
-                `;
-            }
-            if (cached === 'loading') {
+            if (!cached || cached === 'loading') {
+                fetchPopulationData(lat, lng); // 최초 요청 또는 재시도 트리거 (완료되면 자동으로 다시 렌더링됨)
                 return `
                     <div style="background:white; padding:16px; border-radius:10px; border:1px solid #e2e8f0; text-align:center; color:#94a3b8; font-size:14px;">
                         🔄 인구/가구 통계 불러오는 중...
@@ -909,19 +911,31 @@
                 `;
             }
             if (cached === 'error') {
+                fetchPopulationData(lat, lng); // 쿨다운 지났으면 조용히 재시도 (안 지났으면 함수 내부에서 무시됨)
                 return `
-                    <div style="background:white; padding:16px; border-radius:10px; border:1px solid #e2e8f0; text-align:center; color:#94a3b8; font-size:14px;">
-                        ⚠️ 인구/가구 통계를 불러오지 못했습니다.
+                    <div style="background:white; padding:16px; border-radius:10px; border:1px solid #e2e8f0; text-align:center; color:#94a3b8; font-size:14px; cursor:pointer;" onclick="delete populationCache['${key}']; renderTradeAreaAnalysis();">
+                        ⚠️ 인구/가구 통계를 불러오지 못했습니다. (탭하면 다시 시도)
                     </div>
                 `;
             }
 
             // 정상 데이터
             const d = cached;
+            const foodCount = currentStores.length;
+            // 인구수만 던지면 "그래서 뭐?"가 된다. 이미 계산해둔 음식점 수와 엮어서
+            // "음식점 1개당 인구"라는 실제 상권 포화도 지표로 바꾼다 — 이 숫자가 작을수록
+            // 경쟁이 치열하고, 클수록 아직 수요 대비 공급이 부족한 지역이라는 뜻이다.
+            const popPerStore = foodCount > 0 ? Math.round(d.totalPopulation / foodCount) : null;
+            const householdFeel = d.avgHouseholdSize <= 2.2 ? '1인 가구 비중이 높아 배달·혼밥 수요에 유리한' :
+                d.avgHouseholdSize >= 2.8 ? '가족 단위 가구가 많아 외식·모임 수요에 유리한' : '가구 구성이 평균적인';
             return `
                 <div style="background:white; padding:16px; border-radius:10px; border:1px solid #e2e8f0;">
                     <div style="font-size:18px; font-weight:bold; color:#1e293b; margin-bottom:4px;">🏘️ ${d.admName || '이 지역'} 인구/가구 통계</div>
                     <div style="font-size:12px; color:#94a3b8; margin-bottom:10px;">통계청 SGIS · ${d.year}년 기준 (행정동 단위 — 반경과 정확히 일치하지 않을 수 있음)</div>
+                    ${popPerStore ? `
+                    <div style="background:#eff6ff; border:1px solid #dbeafe; border-radius:8px; padding:10px 12px; margin-bottom:12px; font-size:14px; color:#1e40af;">
+                        💡 이 동네는 <strong>음식점 1개당 주민 ${popPerStore.toLocaleString()}명</strong>이 배정되는 셈입니다. 그리고 <strong>${householdFeel}</strong> 지역입니다.
+                    </div>` : ''}
                     <div class="analysis-metric-grid">
                         <div class="analysis-card">
                             <h5>총 인구</h5>
@@ -947,10 +961,15 @@
 
         // ── Tier 2: 국토교통부 상업업무용 부동산 매매 실거래가 ──
         const realEstateCache = {};
+        const realEstateLastAttempt = {};
 
         async function fetchRealEstateData(lat, lng) {
             const key = getPopulationCacheKey(lat, lng); // 같은 격자 캐시 키 재사용
-            if (realEstateCache[key]) return;
+            const cached = realEstateCache[key];
+            if (cached && cached !== 'error') return;
+            if (cached === 'error' && (Date.now() - (realEstateLastAttempt[key] || 0)) < RETRY_COOLDOWN_MS) return;
+
+            realEstateLastAttempt[key] = Date.now();
             realEstateCache[key] = 'loading';
             try {
                 const res = await fetch(`/api/realestate?lat=${lat}&lng=${lng}`);
@@ -969,7 +988,7 @@
             const cached = realEstateCache[key];
 
             if (!cached || cached === 'loading') {
-                if (!cached) fetchRealEstateData(lat, lng);
+                fetchRealEstateData(lat, lng);
                 return `
                     <div style="background:white; padding:16px; border-radius:10px; border:1px solid #e2e8f0; text-align:center; color:#94a3b8; font-size:14px;">
                         🔄 상업용 부동산 실거래가 불러오는 중...
@@ -977,34 +996,41 @@
                 `;
             }
             if (cached === 'error') {
+                fetchRealEstateData(lat, lng); // 쿨다운 지났으면 조용히 재시도
                 return `
-                    <div style="background:white; padding:16px; border-radius:10px; border:1px solid #e2e8f0; text-align:center; color:#94a3b8; font-size:14px;">
-                        ⚠️ 실거래가 정보를 불러오지 못했습니다.
+                    <div style="background:white; padding:16px; border-radius:10px; border:1px solid #e2e8f0; text-align:center; color:#94a3b8; font-size:14px; cursor:pointer;" onclick="delete realEstateCache['${key}']; renderTradeAreaAnalysis();">
+                        ⚠️ 실거래가 정보를 불러오지 못했습니다. (탭하면 다시 시도)
                     </div>
                 `;
             }
             if (!cached.hasData) {
+                const regionLabel = cached.sidoNm && cached.sggNm ? `${cached.sidoNm} ${cached.sggNm}` : '이 지역';
                 return `
                     <div style="background:white; padding:16px; border-radius:10px; border:1px solid #e2e8f0; text-align:center; color:#94a3b8; font-size:14px;">
-                        🏢 최근 3개월간 이 지역(시군구 단위) 상업업무용 부동산 거래 내역이 없습니다.
+                        🏢 최근 3개월간 ${regionLabel}(시군구 단위)에 상업업무용 부동산 거래 내역이 없습니다.
                     </div>
                 `;
             }
 
             const d = cached;
+            const regionLabel = d.sidoNm && d.sggNm ? `${d.sidoNm} ${d.sggNm}` : '이 지역';
             const ymdLabel = `${d.dealMonth.slice(0, 4)}년 ${parseInt(d.dealMonth.slice(4), 10)}월`;
+
+            // 이 카드가 그려질 때마다, 거래가 있었던 동네들을 지도에 마커로 찍는다 (지도 표시 요청 반영).
+            plotRealEstateDongMarkers(d.dongBreakdown, d.sidoNm, d.sggNm);
+
             return `
                 <div style="background:white; padding:16px; border-radius:10px; border:1px solid #e2e8f0;">
-                    <div style="font-size:18px; font-weight:bold; color:#1e293b; margin-bottom:4px;">🏢 상업용 부동산 실거래가</div>
-                    <div style="font-size:12px; color:#94a3b8; margin-bottom:10px;">국토교통부 · ${ymdLabel} 거래 기준 (시군구 단위 — 반경보다 넓은 범위)</div>
+                    <div style="font-size:18px; font-weight:bold; color:#1e293b; margin-bottom:4px;">🏢 ${regionLabel} 상업용 부동산 실거래가</div>
+                    <div style="font-size:12px; color:#94a3b8; margin-bottom:10px;">국토교통부 · ${ymdLabel} 거래 기준 (시군구 전체 — 지도에 보라색 마커로 표시된 동네들의 합산입니다)</div>
                     <div class="analysis-metric-grid">
                         <div class="analysis-card">
                             <h5>거래 건수</h5>
                             <p>${d.transactionCount}건</p>
                         </div>
                         <div class="analysis-card">
-                            <h5>평균 거래가</h5>
-                            <p>${(d.avgPriceManwon / 10000).toFixed(1)}억</p>
+                            <h5>평당가 (㎡→평 환산)</h5>
+                            <p>${d.avgPricePerPyeongManwon ? (d.avgPricePerPyeongManwon / 10000).toFixed(2) + '억' : '-'}</p>
                         </div>
                         <div class="analysis-card">
                             <h5>최고 거래가</h5>
@@ -1015,9 +1041,71 @@
                             <p>${(d.minPriceManwon / 10000).toFixed(1)}억</p>
                         </div>
                     </div>
+                    ${d.avgPricePerPyeongManwon ? `
+                    <div style="background:#fef3c7; border:1px solid #fde68a; border-radius:8px; padding:10px 12px; margin-top:10px; font-size:13px; color:#92400e;">
+                        💡 평당가가 <strong>총 거래가보다 더 정확한 비교 기준</strong>입니다 — 건물 크기가 다르면 총액만으론 비교가 안 되기 때문입니다.
+                    </div>` : ''}
+                    ${d.dongBreakdown && d.dongBreakdown.length > 0 ? `
+                    <div style="margin-top:12px;">
+                        <div style="font-size:14px; font-weight:bold; color:#334155; margin-bottom:6px;">📍 거래 많은 동네 TOP ${Math.min(5, d.dongBreakdown.length)}</div>
+                        ${d.dongBreakdown.slice(0, 5).map((dong, i) => `
+                            <div style="display:flex; justify-content:space-between; padding:4px 0; font-size:13px; color:#475569; ${i>0?'border-top:1px solid #f1f5f9;':''}">
+                                <span>${dong.name}</span>
+                                <span>${dong.count}건 · 평균 ${(dong.avgPriceManwon/10000).toFixed(1)}억</span>
+                            </div>
+                        `).join('')}
+                    </div>` : ''}
+                    ${d.buildingUseBreakdown && d.buildingUseBreakdown.length > 0 ? `
+                    <div style="margin-top:12px;">
+                        <div style="font-size:14px; font-weight:bold; color:#334155; margin-bottom:6px;">🏗️ 거래된 건물 용도 구성</div>
+                        ${d.buildingUseBreakdown.slice(0, 4).map((u) => `
+                            <div style="margin-bottom:6px;">
+                                <div style="display:flex; justify-content:space-between; font-size:12px; color:#334155; margin-bottom:2px;">
+                                    <span>${u.name}</span><span>${u.pct}%</span>
+                                </div>
+                                <div class="metric-bar-bg"><div class="metric-bar-fill" style="width:${u.pct}%; background:#8b5cf6;"></div></div>
+                            </div>
+                        `).join('')}
+                    </div>` : ''}
                     <div style="font-size:12px; color:#94a3b8; margin-top:8px;">※ 반경이 아니라 같은 시군구 전체 거래 기준입니다. 참고용으로만 활용하세요.</div>
                 </div>
             `;
+        }
+
+        // 실거래가 동네(umdNm)들을 지도에 보라색 마커로 표시 — 정확한 번지는 비공개(개인정보)라
+        // 동 단위 대표 지점에 표시하는 근사치이며, 개별 매물 위치가 아니라 "이 동네에 거래가 있었다"는
+        // 뜻이다.
+        let realEstateDongMarkers = [];
+        function plotRealEstateDongMarkers(dongBreakdown, sidoNm, sggNm) {
+            if (!dongBreakdown || dongBreakdown.length === 0) return;
+            const dongKey = dongBreakdown.map(d => d.name).join(',');
+            if (window.__lastPlottedDongKey === dongKey) return; // 같은 목록이면 다시 안 찍는다
+            window.__lastPlottedDongKey = dongKey;
+
+            realEstateDongMarkers.forEach(m => m.setMap(null));
+            realEstateDongMarkers = [];
+
+            dongBreakdown.forEach((dong) => {
+                geocoder.geocode({ address: `${sidoNm} ${sggNm} ${dong.name}` }, (results, status) => {
+                    if (status !== 'OK' || !results[0]) return;
+                    const pos = results[0].geometry.location;
+                    const marker = new google.maps.Marker({
+                        position: pos,
+                        map: map,
+                        icon: {
+                            path: google.maps.SymbolPath.CIRCLE,
+                            fillColor: '#8b5cf6',
+                            fillOpacity: 0.85,
+                            strokeColor: '#ffffff',
+                            strokeWeight: 2,
+                            scale: 8 + Math.min(dong.count, 10), // 거래 건수가 많을수록 큰 원
+                        },
+                        title: `${dong.name}: ${dong.count}건, 평균 ${(dong.avgPriceManwon/10000).toFixed(1)}억`,
+                        zIndex: 999,
+                    });
+                    realEstateDongMarkers.push(marker);
+                });
+            });
         }
 
         function renderHistoryComparison(lat, lng, metrics) {
@@ -1422,7 +1510,7 @@
             let currentZoom = 16; // 초기 진입 시에도 좁은 반경(400m)으로 시작해서 첫 로딩을 빠르게 한다
             radius = getRadiusByZoom(currentZoom); // 전역 변수에 대입 (재선언하면 분석 탭에서 다시 못 봄)
 
-            const map = new google.maps.Map(mapContainer, {
+            map = new google.maps.Map(mapContainer, {
                 center: { lat: currentLat, lng: currentLng },
                 zoom: currentZoom,
                 streetViewControl: false,
@@ -1433,7 +1521,7 @@
                 zoomControlOptions: { position: google.maps.ControlPosition.LEFT_BOTTOM }
             });
 
-            const geocoder = new google.maps.Geocoder();
+            geocoder = new google.maps.Geocoder();
             let centerMarker = null;
             let centerCircle = null;
             let currentMarkers = [];
@@ -2116,7 +2204,7 @@
                     if (geoResolved) return;
                     geoResolved = true;
                     console.warn('⚠️ 위치 정보 가져오기 실패:', reason);
-                    showGuideMessage(`⚠️ ${reason} 기본 위치(서울시청 인근)로 표시합니다. 상단 "📍 내 위치" 버튼으로 다시 시도할 수 있습니다.`);
+                    showGuideMessage(`⚠️ ${reason} 기본 위치(서울시청 인근)로 표시합니다. 지도 위 위치 아이콘(⊙)으로 다시 시도할 수 있습니다.`);
                     updateCenterMarker({ lat: currentLat, lng: currentLng });
                     loadStores(currentLat, currentLng);
                 };
