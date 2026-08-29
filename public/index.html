@@ -725,6 +725,9 @@
                 `;
             }
 
+            html += renderPopulationSection(currentLat, currentLng);
+            html += renderRealEstateSection(currentLat, currentLng);
+
             const historyCard = renderHistoryComparison(currentLat, currentLng, metrics);
             if (historyCard) html += historyCard;
 
@@ -858,6 +861,163 @@
         function getLocationGridKey(lat, lng) {
             // 소수점 3자리 ≈ 약 110m 격자. 같은 반경을 다시 봤다고 인식할 정도의 정밀도.
             return `${lat.toFixed(3)}_${lng.toFixed(3)}`;
+        }
+
+        // ── Tier 2: 통계청 SGIS 인구/가구 통계 ──
+        // 서버가 좌표->행정동코드->통계 2단계로 처리하는 동안 시간이 걸리므로,
+        // 캐시해두고 비동기로 불러와서 도착하면 분석 화면을 다시 그린다.
+        const populationCache = {}; // key: "lat.toFixed(3)_lng.toFixed(3)" -> 결과 또는 'loading' 또는 'error'
+
+        function getPopulationCacheKey(lat, lng) {
+            return `${lat.toFixed(3)}_${lng.toFixed(3)}`;
+        }
+
+        async function fetchPopulationData(lat, lng) {
+            const key = getPopulationCacheKey(lat, lng);
+            if (populationCache[key]) return; // 이미 로딩했거나 로딩 중
+            populationCache[key] = 'loading';
+            try {
+                const res = await fetch(`/api/population?lat=${lat}&lng=${lng}`);
+                const data = await res.json();
+                populationCache[key] = data.success ? data : 'error';
+            } catch (e) {
+                populationCache[key] = 'error';
+            }
+            // 지금 보고 있는 위치와 같으면(다른 곳으로 이동 안 했으면) 분석 화면을 다시 그려서 반영한다.
+            if (getPopulationCacheKey(currentLat, currentLng) === key) {
+                renderTradeAreaAnalysis();
+            }
+        }
+
+        function renderPopulationSection(lat, lng) {
+            const key = getPopulationCacheKey(lat, lng);
+            const cached = populationCache[key];
+
+            if (!cached) {
+                fetchPopulationData(lat, lng); // 최초 요청 트리거 (완료되면 자동으로 다시 렌더링됨)
+                return `
+                    <div style="background:white; padding:16px; border-radius:10px; border:1px solid #e2e8f0; text-align:center; color:#94a3b8; font-size:14px;">
+                        🔄 인구/가구 통계 불러오는 중...
+                    </div>
+                `;
+            }
+            if (cached === 'loading') {
+                return `
+                    <div style="background:white; padding:16px; border-radius:10px; border:1px solid #e2e8f0; text-align:center; color:#94a3b8; font-size:14px;">
+                        🔄 인구/가구 통계 불러오는 중...
+                    </div>
+                `;
+            }
+            if (cached === 'error') {
+                return `
+                    <div style="background:white; padding:16px; border-radius:10px; border:1px solid #e2e8f0; text-align:center; color:#94a3b8; font-size:14px;">
+                        ⚠️ 인구/가구 통계를 불러오지 못했습니다.
+                    </div>
+                `;
+            }
+
+            // 정상 데이터
+            const d = cached;
+            return `
+                <div style="background:white; padding:16px; border-radius:10px; border:1px solid #e2e8f0;">
+                    <div style="font-size:18px; font-weight:bold; color:#1e293b; margin-bottom:4px;">🏘️ ${d.admName || '이 지역'} 인구/가구 통계</div>
+                    <div style="font-size:12px; color:#94a3b8; margin-bottom:10px;">통계청 SGIS · ${d.year}년 기준 (행정동 단위 — 반경과 정확히 일치하지 않을 수 있음)</div>
+                    <div class="analysis-metric-grid">
+                        <div class="analysis-card">
+                            <h5>총 인구</h5>
+                            <p>${Number(d.totalPopulation).toLocaleString()}명</p>
+                        </div>
+                        <div class="analysis-card">
+                            <h5>인구 밀도</h5>
+                            <p>${Number(d.populationDensity).toLocaleString()}명/㎢</p>
+                        </div>
+                        <div class="analysis-card">
+                            <h5>총 가구 수</h5>
+                            <p>${Number(d.totalHouseholds).toLocaleString()}가구</p>
+                        </div>
+                        <div class="analysis-card">
+                            <h5>평균 가구원 수</h5>
+                            <p>${d.avgHouseholdSize}명</p>
+                        </div>
+                    </div>
+                    <div style="font-size:12px; color:#94a3b8; margin-top:8px;">※ 주민등록 거주인구 기준으로, 낮 시간대 유동인구(직장인·방문객)는 포함되지 않습니다.</div>
+                </div>
+            `;
+        }
+
+        // ── Tier 2: 국토교통부 상업업무용 부동산 매매 실거래가 ──
+        const realEstateCache = {};
+
+        async function fetchRealEstateData(lat, lng) {
+            const key = getPopulationCacheKey(lat, lng); // 같은 격자 캐시 키 재사용
+            if (realEstateCache[key]) return;
+            realEstateCache[key] = 'loading';
+            try {
+                const res = await fetch(`/api/realestate?lat=${lat}&lng=${lng}`);
+                const data = await res.json();
+                realEstateCache[key] = data.success ? data : 'error';
+            } catch (e) {
+                realEstateCache[key] = 'error';
+            }
+            if (getPopulationCacheKey(currentLat, currentLng) === key) {
+                renderTradeAreaAnalysis();
+            }
+        }
+
+        function renderRealEstateSection(lat, lng) {
+            const key = getPopulationCacheKey(lat, lng);
+            const cached = realEstateCache[key];
+
+            if (!cached || cached === 'loading') {
+                if (!cached) fetchRealEstateData(lat, lng);
+                return `
+                    <div style="background:white; padding:16px; border-radius:10px; border:1px solid #e2e8f0; text-align:center; color:#94a3b8; font-size:14px;">
+                        🔄 상업용 부동산 실거래가 불러오는 중...
+                    </div>
+                `;
+            }
+            if (cached === 'error') {
+                return `
+                    <div style="background:white; padding:16px; border-radius:10px; border:1px solid #e2e8f0; text-align:center; color:#94a3b8; font-size:14px;">
+                        ⚠️ 실거래가 정보를 불러오지 못했습니다.
+                    </div>
+                `;
+            }
+            if (!cached.hasData) {
+                return `
+                    <div style="background:white; padding:16px; border-radius:10px; border:1px solid #e2e8f0; text-align:center; color:#94a3b8; font-size:14px;">
+                        🏢 최근 3개월간 이 지역(시군구 단위) 상업업무용 부동산 거래 내역이 없습니다.
+                    </div>
+                `;
+            }
+
+            const d = cached;
+            const ymdLabel = `${d.dealMonth.slice(0, 4)}년 ${parseInt(d.dealMonth.slice(4), 10)}월`;
+            return `
+                <div style="background:white; padding:16px; border-radius:10px; border:1px solid #e2e8f0;">
+                    <div style="font-size:18px; font-weight:bold; color:#1e293b; margin-bottom:4px;">🏢 상업용 부동산 실거래가</div>
+                    <div style="font-size:12px; color:#94a3b8; margin-bottom:10px;">국토교통부 · ${ymdLabel} 거래 기준 (시군구 단위 — 반경보다 넓은 범위)</div>
+                    <div class="analysis-metric-grid">
+                        <div class="analysis-card">
+                            <h5>거래 건수</h5>
+                            <p>${d.transactionCount}건</p>
+                        </div>
+                        <div class="analysis-card">
+                            <h5>평균 거래가</h5>
+                            <p>${(d.avgPriceManwon / 10000).toFixed(1)}억</p>
+                        </div>
+                        <div class="analysis-card">
+                            <h5>최고 거래가</h5>
+                            <p>${(d.maxPriceManwon / 10000).toFixed(1)}억</p>
+                        </div>
+                        <div class="analysis-card">
+                            <h5>최저 거래가</h5>
+                            <p>${(d.minPriceManwon / 10000).toFixed(1)}억</p>
+                        </div>
+                    </div>
+                    <div style="font-size:12px; color:#94a3b8; margin-top:8px;">※ 반경이 아니라 같은 시군구 전체 거래 기준입니다. 참고용으로만 활용하세요.</div>
+                </div>
+            `;
         }
 
         function renderHistoryComparison(lat, lng, metrics) {
