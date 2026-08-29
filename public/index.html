@@ -730,8 +730,7 @@
 
             if (window.__lastFetchTruncated) {
                 const totalRaw = (window.__loadProgress && window.__loadProgress.total) || '?';
-                const rawFetched = (window.__loadProgress && window.__loadProgress.loaded) || '?';
-                html += `<div style="font-size:14px; color:#94a3b8; text-align:center;">⚠️ 반경 내 음식점 전체 ${totalRaw}건 중 ${rawFetched}건까지만 조회했습니다. 반경을 줄이면 더 정확합니다.</div>`;
+                html += `<div style="font-size:14px; color:#94a3b8; text-align:center;">⚠️ 이 반경엔 음식점이 ${totalRaw}건 이상으로 많아 위 수치는 일부만 반영된 결과입니다. 반경을 줄이면 더 정확합니다.</div>`;
             }
 
             dashboardContainer.innerHTML = html;
@@ -1741,7 +1740,7 @@
                         window.__lastFetchTruncated = true;
                         // 서버가 업종 필터를 지원하지 않아서, 반경 내 "전체 업종"(음식점 아닌 것 포함) 중
                         // 일부만 받아서 그 안에서 음식점을 골라낸 결과라는 걸 분명히 밝힌다.
-                        showGuideMessage(`📍 음식점 <strong>${currentStores.length}건</strong> 분석 완료 (반경 내 음식점 전체 ${totalCount}건 중 ${allItems.length}건까지만 조회함). 반경을 줄이면 더 정확합니다.`);
+                        showGuideMessage(`📍 음식점 <strong>${currentStores.length}건</strong> 분석 완료 (이 반경엔 음식점이 ${totalCount}건 이상으로 많아 일부만 조회했습니다). 반경을 줄이면 더 정확합니다.`);
                     }
                     renderTradeAreaAnalysis(); // 로딩 완료 상태를 분석 화면에도 최종 반영
                 } catch (error) {
