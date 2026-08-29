@@ -1,6 +1,7 @@
 const express = require('express');
 const path = require('path');
 const axios = require('axios');
+const { parseStringPromise } = require('xml2js');
 const https = require('https');
 require('dotenv').config();
 
@@ -9,7 +10,17 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, 'public')));
+// 개발 중 캐시 때문에 "고친 코드가 반영 안 된 것처럼 보이는" 혼란이 반복돼서,
+// 브라우저가 index.html 등 정적 파일을 캐시하지 않도록 명시적으로 지시한다.
+app.use(express.static(path.join(__dirname, 'public'), {
+  etag: false,
+  lastModified: false,
+  setHeaders: (res) => {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+  },
+}));
 
 // ------------------------------------------------------------
 // 공공데이터 API 인증키 — 반드시 환경변수로 관리한다.
@@ -368,14 +379,25 @@ async function fetchRealEstateForMonth(lawdCd, dealYmd) {
     throw new Error(`게이트웨이 오류: ${gwErr?.errMsg || JSON.stringify(response.data.OpenAPI_ServiceResponse)}`);
   }
 
-  // 이 API는 XML을 기본으로 하는 구형 API라 JSON 응답이 "response" 래퍼로 감싸져 오는 게
-  // 일반적이지만, 혹시 안 감싸져 오는 경우도 방어적으로 같이 확인한다.
-  const root = response.data?.response || response.data;
+  // ⚠️ 핵심 버그였던 부분: type=json으로 요청해도 이 API는 XML 텍스트를 그대로 돌려준다.
+  // axios는 JSON 컨텐츠타입만 자동으로 객체로 파싱해주기 때문에, response.data가 사실은
+  // "<?xml..." 로 시작하는 순수 문자열이었다. 그런데 코드는 이미 파싱된 객체인 것처럼
+  // response.data.response.header... 로 읽으려고 해서 항상 undefined -> 빈 배열이 나왔다.
+  // (로그엔 원본 텍스트가 찍혀서 데이터가 있는 것처럼 보였지만, 실제 코드는 그 안에서
+  // 아무것도 못 꺼내고 있었다.)
+  let root;
+  if (typeof response.data === 'string') {
+    const parsed = await parseStringPromise(response.data, { explicitArray: false, trim: true });
+    root = parsed.response || parsed;
+  } else {
+    root = response.data?.response || response.data;
+  }
+
   const resultCode = root?.header?.resultCode;
+  console.log(`🏢 [진단] 실거래가 ${lawdCd}/${dealYmd} 파싱 결과: resultCode=${resultCode}, items 존재=${!!root?.body?.items}`);
 
-  console.log(`🏢 [진단] 실거래가 ${lawdCd}/${dealYmd} 원본 응답:`, JSON.stringify(response.data).slice(0, 1500));
-
-  if (resultCode !== undefined && resultCode !== '00') {
+  // 이 API는 성공 코드가 '00'이 아니라 '000'(세 자리)이다 — 다른 데이터포털 API들과 관례가 다르다.
+  if (resultCode !== undefined && resultCode !== '00' && resultCode !== '000') {
     throw new Error(`실거래가 API 오류(resultCode ${resultCode}): ${root?.header?.resultMsg || '알 수 없음'}`);
   }
 
@@ -436,28 +458,75 @@ app.get('/api/realestate', async (req, res) => {
           monthErrors,
         });
       }
-      return res.status(200).json({ success: true, lawdCd, hasData: false, message: '최근 3개월간 이 지역 상업업무용 부동산 거래 내역이 없습니다.', monthsChecked: 3 - monthErrors.length });
+      return res.status(200).json({ success: true, lawdCd, sidoNm: raw.sido_nm, sggNm: raw.sgg_nm, hasData: false, message: '최근 3개월간 이 지역 상업업무용 부동산 거래 내역이 없습니다.', monthsChecked: 3 - monthErrors.length });
     }
 
     // 필드명은 국토부 기술문서 기준 예상값이며, 실제 응답에서 다를 경우를 대비해 여러 후보를 확인한다.
-    const parsePrice = (item) => {
-      const raw = item.dealAmount || item.거래금액 || '0';
-      return parseInt(String(raw).replace(/,/g, '').trim(), 10) || 0;
-    };
+    const parsePrice = (item) => parseInt(String(item.dealAmount || item.거래금액 || '0').replace(/,/g, '').trim(), 10) || 0;
+    const parseArea = (item) => parseFloat(item.buildingAr || item.건물면적 || '0') || 0;
+
+    // 총액만 보면 500㎡짜리 건물과 50㎡짜리 건물이 같은 10억이어도 완전히 다른 가치인데
+    // 구분이 안 된다. 평당가(㎡ -> 평 환산, 1평=3.3058㎡)로 정규화해야 서로 비교가 된다.
+    const pricePerPyeongList = items.map((item) => {
+      const price = parsePrice(item); // 만원 단위
+      const areaM2 = parseArea(item);
+      if (price <= 0 || areaM2 <= 0) return null;
+      const pyeong = areaM2 / 3.3058;
+      return price / pyeong; // 만원/평
+    }).filter((v) => v !== null && v > 0 && isFinite(v));
+
+    const avgPricePerPyeong = pricePerPyeongList.length > 0
+      ? Math.round(pricePerPyeongList.reduce((a, b) => a + b, 0) / pricePerPyeongList.length)
+      : null;
+
     const prices = items.map(parsePrice).filter((p) => p > 0);
     const avgPrice = prices.length > 0 ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length) : 0;
     const maxPrice = prices.length > 0 ? Math.max(...prices) : 0;
     const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
 
+    // 동(umdNm)별 집계 — 지도에 마커로 찍어서 "이 구 안 어느 동네에서 거래가 많았는지" 보여주는 용도.
+    const dongGroups = {};
+    items.forEach((item) => {
+      const dong = item.umdNm || item.법정동 || '기타';
+      if (!dongGroups[dong]) dongGroups[dong] = [];
+      dongGroups[dong].push(item);
+    });
+    const dongBreakdown = Object.entries(dongGroups)
+      .map(([name, dongItems]) => {
+        const dongPrices = dongItems.map(parsePrice).filter((p) => p > 0);
+        return {
+          name,
+          count: dongItems.length,
+          avgPriceManwon: dongPrices.length > 0 ? Math.round(dongPrices.reduce((a, b) => a + b, 0) / dongPrices.length) : 0,
+        };
+      })
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8);
+
+    // 건물 용도 구성 — "근린생활시설(상가) 위주인지, 업무용(오피스) 위주인지"는 상권 성격을 보여준다.
+    const useGroups = {};
+    items.forEach((item) => {
+      const use = item.buildingUse || item.건물용도 || '기타';
+      useGroups[use] = (useGroups[use] || 0) + 1;
+    });
+    const buildingUseBreakdown = Object.entries(useGroups)
+      .map(([name, count]) => ({ name, count, pct: Math.round((count / items.length) * 100) }))
+      .sort((a, b) => b.count - a.count);
+
     return res.status(200).json({
       success: true,
       lawdCd,
+      sidoNm: raw.sido_nm,
+      sggNm: raw.sgg_nm,
       hasData: true,
       dealMonth: usedYmd,
       transactionCount: items.length,
       avgPriceManwon: avgPrice, // 만원 단위 (국토부 API 관례)
       maxPriceManwon: maxPrice,
       minPriceManwon: minPrice,
+      avgPricePerPyeongManwon: avgPricePerPyeong, // 평당가 (만원/평) — 면적 정규화된 비교 가능 지표
+      dongBreakdown,
+      buildingUseBreakdown,
       sampleRaw: items[0], // 디버깅용 — 필드명이 예상과 다를 경우 이 값으로 확인 가능
     });
   } catch (error) {
