@@ -1697,11 +1697,16 @@
                 const tel = (store.telno && store.telno.trim() !== '') ? store.telno : generateMockTel(store.bizesId, address);
                 const category = store.indsSclsNm || '음식점';
                 const mapUrl = getMapSearchUrl(name, address);
+                // 구글 스트리트뷰로 바로 진입하는 링크. viewpoint에 좌표를 넣으면 그 지점 기준으로
+                // 파노라마 화면이 바로 뜬다 (해당 지점에 스트리트뷰 이미지가 없으면 구글이 자동으로
+                // 가장 가까운 촬영 지점을 보여준다).
+                const streetViewUrl = `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${position.lat},${position.lng}`;
 
                 const popupHtml = `
                     <div class="custom-popup-bubble">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                            <a href="${mapUrl}" target="_blank" style="font-weight:bold; font-size:20px; color:#2563eb; text-decoration:none; max-width: 200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${name}</a>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; gap:8px;">
+                            <a href="${mapUrl}" target="_blank" style="font-weight:bold; font-size:20px; color:#2563eb; text-decoration:none; max-width: 165px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${name}</a>
+                            <a href="${streetViewUrl}" target="_blank" title="스트리트뷰로 보기" style="flex-shrink:0; width:26px; height:26px; display:flex; align-items:center; justify-content:center; font-size:18px; text-decoration:none;">🚶</a>
                         </div>
                         <div style="font-size:15px; color:#64748b; margin-bottom:2px;">[${category}]</div>
                         <div style="font-size:15px; color:#475569; margin-bottom:2px; line-height:1.2;">📍 ${address}</div>
