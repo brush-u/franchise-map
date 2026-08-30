@@ -385,11 +385,22 @@
         // 상권 분석 함수들은 initApp() 바깥(전역)에 있어서 여기서 선언해야 서로 접근 가능하다.
         // (예전엔 initApp() 안에서만 선언되어 있어서 분석 탭이 이 값들을 아예 못 읽고 조용히 실패했다)
         let currentStores = [];
+        let activePopupOverlay = null; // 맛집/실거래가 팝업이 서로를 닫을 수 있어야 해서 전역으로 관리
         let radius = 400;
         // map/geocoder도 같은 이유로 전역에 선언한다 — initApp() 안에서만 선언돼 있으면
         // 지도에 마커를 찍는 전역 함수(plotRealEstateDongMarkers 등)가 접근을 못 한다.
         let map = null;
         let geocoder = null;
+
+        // 구글 기본 InfoWindow는 닫기(X) 버튼 자리를 항상 고정으로 확보해서, 내용이 작으면
+        // 그 옆이 휑하게 비어 보인다. 그래서 완전히 직접 그리는 커스텀 말풍선을 쓴다.
+        // 맛집 팝업/실거래가 마커 팝업 둘 다 이 클래스를 공유해서 디자인을 통일한다.
+        // ⚠️ "extends google.maps.OverlayView"는 이 줄이 실행되는 순간 바로 google.maps를
+        // 참조하는데, 구글맵은 비동기로 로드돼서 이 스크립트가 실행될 때 아직 준비 안 됐을 수 있다.
+        // 그러면 여기서 에러가 나서 이 아래 모든 코드(initApp 포함)가 통째로 실행이 안 된다.
+        // 그래서 변수만 미리 선언해두고, 실제 클래스 정의는 google.maps가 확실히 준비된
+        // initApp() 안에서 대입한다.
+        let CustomPopupOverlay;
         // 서버가 업종 필터를 지원하지 않는 것으로 확인되어(Q, 12 둘 다 NODATA_ERROR), 이제 "원본을 몇 건
         // 받았나"가 아니라 "실제 음식점을 몇 건 확보했나"를 기준으로 언제까지 더 받을지 결정한다.
         const MAX_FOOD_TARGET = 1000;   // 목표: 음식점이 이만큼 모이면 그만 받는다
@@ -1080,7 +1091,7 @@
         // 동 단위 대표 지점에 표시하는 근사치이며, 개별 매물 위치가 아니라 "이 동네에 거래가 있었다"는
         // 뜻이다.
         let realEstateDongMarkers = [];
-        let realEstateInfoWindow = null;
+        let activeRealEstatePopup = null;
         function plotRealEstateDongMarkers(dongBreakdown, sidoNm, sggNm) {
             if (!dongBreakdown || dongBreakdown.length === 0) return;
             const dongKey = dongBreakdown.map(d => d.name).join(',');
@@ -1089,7 +1100,6 @@
 
             realEstateDongMarkers.forEach(m => m.setMap(null));
             realEstateDongMarkers = [];
-            if (!realEstateInfoWindow) realEstateInfoWindow = new google.maps.InfoWindow();
 
             dongBreakdown.forEach((dong) => {
                 geocoder.geocode({ address: `${sidoNm} ${sggNm} ${dong.name}` }, (results, status) => {
@@ -1106,19 +1116,39 @@
                             strokeWeight: 2,
                             scale: 8 + Math.min(dong.count, 10), // 거래 건수가 많을수록 큰 원
                         },
-                        title: `${dong.name}: ${dong.count}건, 평균 ${(dong.avgPriceManwon/10000).toFixed(1)}억`,
+                        title: `상업용 부동산 실거래가 - ${dong.name}: ${dong.count}건, 평균 ${(dong.avgPriceManwon/10000).toFixed(1)}억`,
                         zIndex: 999,
                     });
-                    // 클릭하면 정보창이 뜨도록 (호버 툴팁만으론 모바일에서 아예 안 보임)
+                    // 클릭하면 팝업이 뜨도록 (호버 툴팁만으론 모바일에서 아예 안 보임)
+                    // — 맛집 팝업과 똑같은 CustomPopupOverlay를 써서 여백/닫기버튼 디자인을 통일한다.
                     marker.addListener('click', () => {
-                        realEstateInfoWindow.setContent(`
-                            <div style="padding:4px 2px; font-size:14px; line-height:1.6;">
-                                <div style="font-weight:bold; color:#1e293b; margin-bottom:4px;">🏢 ${sidoNm} ${sggNm} ${dong.name}</div>
-                                <div>거래 건수: <strong>${dong.count}건</strong></div>
-                                <div>평균 거래가: <strong>${(dong.avgPriceManwon/10000).toFixed(1)}억</strong></div>
+                        if (activeRealEstatePopup) activeRealEstatePopup.setMap(null);
+                        if (activePopupOverlay) { activePopupOverlay.setMap(null); activePopupOverlay = null; }
+
+                        const popupHtml = `
+                            <div class="custom-popup-bubble" style="width:230px;">
+                                <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
+                                    <div style="display:inline-block; background:#f3e8ff; color:#7c3aed; font-size:11px; font-weight:bold; padding:3px 9px; border-radius:10px;">🏢 상업용 부동산 실거래가</div>
+                                    <button id="realestate-popup-close-btn" style="background:none; border:none; padding:0; margin-left:6px; cursor:pointer; font-size:18px; line-height:1; color:#94a3b8; flex-shrink:0;">✕</button>
+                                </div>
+                                <div style="font-weight:bold; font-size:16px; color:#1e293b; margin-bottom:6px; line-height:1.3;">${sidoNm} ${sggNm} ${dong.name}</div>
+                                <div style="display:flex; justify-content:space-between; align-items:center; padding:5px 0; border-top:1px solid #f1f5f9; font-size:14px;">
+                                    <span style="color:#64748b;">거래 건수</span>
+                                    <strong style="color:#1e293b;">${dong.count}건</strong>
+                                </div>
+                                <div style="display:flex; justify-content:space-between; align-items:center; padding:5px 0; border-top:1px solid #f1f5f9; font-size:14px;">
+                                    <span style="color:#64748b;">평균 거래가</span>
+                                    <strong style="color:#7c3aed;">${(dong.avgPriceManwon/10000).toFixed(1)}억</strong>
+                                </div>
                             </div>
-                        `);
-                        realEstateInfoWindow.open(map, marker);
+                        `;
+                        const popup = new CustomPopupOverlay(pos, popupHtml);
+                        popup.setMap(map);
+                        activeRealEstatePopup = popup;
+                        setTimeout(() => {
+                            const closeBtn = document.getElementById('realestate-popup-close-btn');
+                            if (closeBtn) closeBtn.onclick = () => { popup.setMap(null); activeRealEstatePopup = null; };
+                        }, 0);
                     });
                     realEstateDongMarkers.push(marker);
                 });
@@ -1248,6 +1278,26 @@
         }
 
         function initApp() {
+            // 이 시점엔 google.maps가 100% 로드되어 있다는 게 보장된다 (initApp 자체가 구글맵의
+            // 로드 완료 콜백으로 호출되기 때문). 그래서 여기서 안전하게 클래스를 정의한다.
+            CustomPopupOverlay = class extends google.maps.OverlayView {
+                constructor(pos, html) { super(); this.position = pos; this.contentHtml = html; this.div = null; }
+                onAdd() {
+                    this.div = document.createElement('div');
+                    this.div.style.position = 'absolute';
+                    this.div.innerHTML = this.contentHtml;
+                    this.getPanes().floatPane.appendChild(this.div);
+                    this.div.onclick = (e) => e.stopPropagation();
+                }
+                draw() {
+                    const proj = this.getProjection();
+                    if (!proj) return;
+                    const point = proj.fromLatLngToDivPixel(this.position);
+                    if (point) { this.div.style.left = point.x + 'px'; this.div.style.top = point.y + 'px'; }
+                }
+                onRemove() { if (this.div) { this.div.parentNode.removeChild(this.div); this.div = null; } }
+            };
+
             const sidebar = document.getElementById('sidebar');
             const mapContainer = document.getElementById('map');
             const dragHandle = document.getElementById('drag-handle');
@@ -1566,7 +1616,6 @@
                     },
                 })
                 : null;
-            let activePopupOverlay = null;
             currentStores = []; // 전역 변수 사용 (재선언하면 분석 탭에서 다시 못 봄)
             let isAllCollapsed = false;
 
@@ -1641,30 +1690,13 @@
                     activePopupOverlay.setMap(null);
                     activePopupOverlay = null;
                 }
+                if (activeRealEstatePopup) { activeRealEstatePopup.setMap(null); activeRealEstatePopup = null; }
 
                 const name = store.bizesNm || '상호명 없음';
                 const address = store.rdnmAdr || store.lnoAdr || '주소 정보 없음';
                 const tel = (store.telno && store.telno.trim() !== '') ? store.telno : generateMockTel(store.bizesId, address);
                 const category = store.indsSclsNm || '음식점';
                 const mapUrl = getMapSearchUrl(name, address);
-
-                class CustomPopupOverlay extends google.maps.OverlayView {
-                    constructor(pos, html) { super(); this.position = pos; this.contentHtml = html; this.div = null; }
-                    onAdd() {
-                        this.div = document.createElement('div');
-                        this.div.style.position = 'absolute';
-                        this.div.innerHTML = this.contentHtml;
-                        this.getPanes().floatPane.appendChild(this.div);
-                        this.div.onclick = (e) => e.stopPropagation();
-                    }
-                    draw() {
-                        const proj = this.getProjection();
-                        if (!proj) return;
-                        const point = proj.fromLatLngToDivPixel(this.position);
-                        if (point) { this.div.style.left = point.x + 'px'; this.div.style.top = point.y + 'px'; }
-                    }
-                    onRemove() { if (this.div) { this.div.parentNode.removeChild(this.div); this.div = null; } }
-                }
 
                 const popupHtml = `
                     <div class="custom-popup-bubble">
