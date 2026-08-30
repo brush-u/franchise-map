@@ -1700,7 +1700,10 @@
                 // 구글 스트리트뷰로 바로 진입하는 링크. viewpoint에 좌표를 넣으면 그 지점 기준으로
                 // 파노라마 화면이 바로 뜬다 (해당 지점에 스트리트뷰 이미지가 없으면 구글이 자동으로
                 // 가장 가까운 촬영 지점을 보여준다).
-                const streetViewUrl = `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${position.lat},${position.lng}`;
+                // 공식 문서 형식(api=1&map_action=pano)은 모바일에서 구글맵 앱이 링크를 가로채면서
+                // 실제 스트리트뷰 대신 정적 미리보기 사진만 보여주는 경우가 있었다. layer=c&cbll= 형식이
+                // 앱/웹 양쪽에서 실제 파노라마 모드로 더 안정적으로 진입한다고 확인되어 이걸로 바꾼다.
+                const streetViewUrl = `https://www.google.com/maps?layer=c&cbll=${position.lat},${position.lng}`;
 
                 const popupHtml = `
                     <div class="custom-popup-bubble">
